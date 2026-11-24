@@ -1448,8 +1448,15 @@
             updateIndividualStatusBar(end, true);
 
             const filteredData = fullDataInd.slice(start, end + 1);
-            
             const datasets = [];
+            const visibleYValues = [];
+
+            // Recolectar valores de precio visibles para escalar correctamente el eje Y
+            filteredData.forEach(d => {
+                if (d.h != null) visibleYValues.push(d.h);
+                if (d.l != null) visibleYValues.push(d.l);
+                if (d.c != null) visibleYValues.push(d.c);
+            });
 
             // Dataset Principal (Velas o Línea)
             if (chartType === 'candlestick') {
@@ -1457,6 +1464,16 @@
                     label: `Precio ${assetName}`,
                     data: filteredData.filter(d => d.c != null),
                     type: 'candlestick',
+                    color: {
+                        up: '#10B981',
+                        down: '#EF4444',
+                        unchanged: '#9CA3AF'
+                    },
+                    borderColor: {
+                        up: '#10B981',
+                        down: '#EF4444',
+                        unchanged: '#9CA3AF'
+                    },
                     yAxisID: 'y'
                 });
             } else {
@@ -1473,27 +1490,59 @@
                 });
             }
 
-            if (sEma21) datasets.push({ type: 'line', label: 'EMA 21', data: (precomputedInd ? precomputedInd.ema21 : calculateMA(fullDataInd, 21, true)).slice(start, end + 1), borderColor: '#F472B6', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
-            if (sSma50) datasets.push({ type: 'line', label: 'SMA 50', data: (precomputedInd ? precomputedInd.sma50 : calculateMA(fullDataInd, 50)).slice(start, end + 1), borderColor: '#F59E0B', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
-            if (sSma200) datasets.push({ type: 'line', label: 'SMA 200', data: (precomputedInd ? precomputedInd.sma200 : calculateMA(fullDataInd, 200)).slice(start, end + 1), borderColor: '#EF4444', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            if (sEma21) {
+                const ema21Slice = (precomputedInd ? precomputedInd.ema21 : calculateMA(fullDataInd, 21, true)).slice(start, end + 1);
+                ema21Slice.forEach(p => { if (p.y != null) visibleYValues.push(p.y); });
+                datasets.push({ type: 'line', label: 'EMA 21', data: ema21Slice, borderColor: '#F472B6', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            }
+            if (sSma50) {
+                const sma50Slice = (precomputedInd ? precomputedInd.sma50 : calculateMA(fullDataInd, 50)).slice(start, end + 1);
+                sma50Slice.forEach(p => { if (p.y != null) visibleYValues.push(p.y); });
+                datasets.push({ type: 'line', label: 'SMA 50', data: sma50Slice, borderColor: '#F59E0B', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            }
+            if (sSma200) {
+                const sma200Slice = (precomputedInd ? precomputedInd.sma200 : calculateMA(fullDataInd, 200)).slice(start, end + 1);
+                sma200Slice.forEach(p => { if (p.y != null) visibleYValues.push(p.y); });
+                datasets.push({ type: 'line', label: 'SMA 200', data: sma200Slice, borderColor: '#EF4444', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            }
             
             if (sBB) {
                 const bb = precomputedInd ? { upper: precomputedInd.bbUp, lower: precomputedInd.bbLow } : calculateBollinger(fullDataInd, 20, 2);
-                datasets.push({ type: 'line', label: 'BB Up', data: bb.upper.slice(start, end + 1), borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
-                datasets.push({ type: 'line', label: 'BB Low', data: bb.lower.slice(start, end + 1), borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
+                const bbUpSlice = bb.upper.slice(start, end + 1);
+                const bbLowSlice = bb.lower.slice(start, end + 1);
+                bbUpSlice.forEach(p => { if (p.y != null) visibleYValues.push(p.y); });
+                bbLowSlice.forEach(p => { if (p.y != null) visibleYValues.push(p.y); });
+                datasets.push({ type: 'line', label: 'BB Up', data: bbUpSlice, borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
+                datasets.push({ type: 'line', label: 'BB Low', data: bbLowSlice, borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
             }
 
             // Señales de Trading
+            const visibleBuy = signalsBuy.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
+            const visibleSell = signalsSell.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
+            visibleBuy.forEach(s => { if (s.y != null) visibleYValues.push(s.y); });
+            visibleSell.forEach(s => { if (s.y != null) visibleYValues.push(s.y); });
+
             datasets.push({
                 type: 'scatter', label: 'Señal Compra',
-                data: signalsBuy.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x),
+                data: visibleBuy,
                 backgroundColor: '#10B981', pointStyle: 'triangle', rotation: 0, radius: 7, hoverRadius: 9, yAxisID: 'y'
             });
             datasets.push({
                 type: 'scatter', label: 'Señal Venta',
-                data: signalsSell.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x),
+                data: visibleSell,
                 backgroundColor: '#EF4444', pointStyle: 'triangle', rotation: 180, radius: 7, hoverRadius: 9, yAxisID: 'y'
             });
+
+            // Calcular límites explícitos del eje Y para evitar recortes en modo Velas Japonesas
+            let yAxisMin = undefined;
+            let yAxisMax = undefined;
+            if (visibleYValues.length > 0) {
+                const rawMin = Math.min(...visibleYValues);
+                const rawMax = Math.max(...visibleYValues);
+                const pad = (rawMax - rawMin) * 0.06 || (rawMax * 0.05) || 1;
+                yAxisMin = Math.max(0, rawMin - pad);
+                yAxisMax = rawMax + pad;
+            }
 
             // Sub-Panel Inferior
             let customAnnotations = {};
@@ -1519,18 +1568,21 @@
                 customAnnotations.rsi30 = { type: 'line', yMin: 30, yMax: 30, yScaleID: 'ySub', borderColor: 'rgba(16, 185, 129, 0.4)', borderDash: [4, 4], borderWidth: 1 };
             }
 
-            // Etiqueta Ultimo Precio
+            // Etiqueta Ultimo Precio (clip: false para que no se corte en el borde derecho)
             const validBars = filteredData.filter(d => d.c != null);
             const lastValidBar = validBars.length > 0 ? validBars[validBars.length - 1] : null;
             const lastPrice = lastValidBar ? lastValidBar.c : 0;
             customAnnotations.lastPriceBadge = {
-                type: 'label', yScaleID: 'y', xScaleID: 'x',
+                type: 'label',
+                clip: false,
+                yScaleID: 'y',
+                xScaleID: 'x',
                 xValue: lastValidBar ? lastValidBar.x : 0,
                 yValue: lastPrice,
                 content: '$' + lastPrice.toFixed(2),
                 backgroundColor: '#3B82F6', color: '#0B1120',
                 font: { size: 11, family: 'Inter', weight: 'bold' },
-                padding: {x: 4, y: 2}, borderRadius: 4,
+                padding: {x: 5, y: 2}, borderRadius: 4,
                 position: 'start', xAdjust: 6
             };
 
@@ -1540,7 +1592,7 @@
                 data: { datasets: datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { left: 15, right: 55, top: 8 } },
+                    layout: { padding: { left: 15, right: 78, top: 8 } },
                     events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
@@ -1587,8 +1639,10 @@
                             type: 'linear', position: 'left', 
                             stack: 'indGroup', stackWeight: 70, 
                             offset: true,
+                            min: yAxisMin,
+                            max: yAxisMax,
                             grid: { color: '#374151' },
-                            ticks: { color: '#9CA3AF', callback: function(value) { return '$' + value; } }
+                            ticks: { color: '#9CA3AF', callback: function(value) { return '$' + Number(value).toFixed(value >= 100 ? 0 : 2); } }
                         }
                     },
                     onHover: (event, elements) => {
@@ -1752,6 +1806,7 @@
                 },
                 lastZBadge: {
                     type: 'label',
+                    clip: false,
                     yScaleID: 'yZ',
                     xScaleID: 'x',
                     xValue: lastZPt.x,
@@ -1760,13 +1815,14 @@
                     backgroundColor: '#38BDF8',
                     color: '#0B1120',
                     font: { size: 10, family: 'Inter', weight: 'bold' },
-                    padding: { x: 4, y: 2 },
+                    padding: { x: 5, y: 2 },
                     borderRadius: 4,
                     position: 'start',
                     xAdjust: 6
                 },
                 lastRatioBadge: {
                     type: 'label',
+                    clip: false,
                     yScaleID: 'yRatio',
                     xScaleID: 'x',
                     xValue: lastRPt.x,
@@ -1775,7 +1831,7 @@
                     backgroundColor: '#A78BFA',
                     color: '#0B1120',
                     font: { size: 10, family: 'Inter', weight: 'bold' },
-                    padding: { x: 4, y: 2 },
+                    padding: { x: 5, y: 2 },
                     borderRadius: 4,
                     position: 'start',
                     xAdjust: 6
@@ -1824,7 +1880,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    layout: { padding: { left: 12, right: 55, top: 8 } },
+                    layout: { padding: { left: 12, right: 68, top: 8 } },
                     events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
