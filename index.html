@@ -94,7 +94,7 @@
             </button>
             <div class="text-center sm:text-right">
                 <div class="text-sm text-slate-400">Última actualización (Yahoo Finance)</div>
-                <div class="text-lg font-semibold text-blue-400" id="last-update">Hoy, 18:30 ART</div>
+                <div class="text-lg font-semibold text-blue-400" id="last-update">Cargando datos...</div>
             </div>
         </div>
     </header>
@@ -963,16 +963,24 @@
 
         // Inicializar datos de respaldo (en caso de abrir localmente sin datos_adrs.json)
         function initFallbackData() {
-            const MOCK_DAYS = 1260;
-            let baseDate = new Date();
-            baseDate.setDate(baseDate.getDate() - Math.floor(MOCK_DAYS * 1.45));
-
-            dates = [];
-            let d = new Date(baseDate);
-            while (dates.length < MOCK_DAYS) {
-                if (d.getDay() !== 0 && d.getDay() !== 6) dates.push(new Date(d).getTime());
-                d.setDate(d.getDate() + 1);
+            const lastUpdateEl = document.getElementById('last-update');
+            if (lastUpdateEl) {
+                lastUpdateEl.innerText = 'Vista previa (datos simulados)';
+                lastUpdateEl.className = 'text-sm sm:text-base font-semibold text-amber-400';
             }
+
+            // Generar las últimas 1260 ruedas hábiles terminando exactamente en la fecha actual
+            const MOCK_DAYS = 1260;
+            dates = [];
+            let cursor = new Date();
+            cursor.setHours(18, 30, 0, 0);
+            while (dates.length < MOCK_DAYS) {
+                if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
+                    dates.push(cursor.getTime());
+                }
+                cursor.setDate(cursor.getDate() - 1);
+            }
+            dates.reverse();
 
             let val = 25;
             fullDataInd = dates.map(dt => {
@@ -1190,7 +1198,6 @@
             const tbodyCorr = document.getElementById('matrix-corr');
             const tbodyZ = document.getElementById('matrix-zscore');
             const hideLowCorr = document.getElementById('toggle-corr-filter').checked;
-            const tooltip = document.getElementById('matrix-tooltip');
 
             let theadHTML = `<thead><tr><th class="sticky left-0 z-20 bg-[#0B1120] border-b border-slate-600 p-2">ADR</th>`;
             validADRs.forEach(a => theadHTML += `<th class="border-b border-slate-600 p-2 font-medium text-slate-400 bg-[#0B1120]">${a}</th>`);
@@ -1260,7 +1267,6 @@
             `;
             tt.classList.remove('hidden');
             
-            // Adjust position
             let left = e.pageX + 15;
             let top = e.pageY + 15;
             if (left + 200 > window.innerWidth) left = e.pageX - 215;
@@ -1271,14 +1277,12 @@
         function hideMatrixTooltip() { document.getElementById('matrix-tooltip').classList.add('hidden'); }
 
         function selectPairFromMatrix(assetA, assetB) {
-            if (assetA === assetB) return; // Ignore diag
+            if (assetA === assetB) return;
             document.getElementById('spread-asset-a').value = assetA;
             document.getElementById('spread-asset-b').value = assetB;
             
-            // Scroll to chart
             document.getElementById('section-rv').scrollIntoView({behavior: 'smooth', block: 'start'});
             
-            // Highlight validation
             document.getElementById('spread-asset-a').classList.add('ring-2', 'ring-blue-500');
             document.getElementById('spread-asset-b').classList.add('ring-2', 'ring-blue-500');
             setTimeout(() => {
@@ -1352,17 +1356,16 @@
                     startIndex = Math.max(0, dates.length - daysToKeep);
                 }
             } else if (fromInput || toInput) {
-                let fDate = fromInput ? new Date(fromInput) : dates[0];
-                let tDate = toInput ? new Date(toInput) : dates[dates.length - 1];
+                let fDate = fromInput ? new Date(fromInput) : new Date(dates[0]);
+                let tDate = toInput ? new Date(toInput) : new Date(dates[dates.length - 1]);
                 
-                // Ajustar horas para no tener errores de zona horaria con el selector YYYY-MM-DD
                 fDate.setHours(0,0,0,0);
                 tDate.setHours(23,59,59,999);
 
-                startIndex = dates.findIndex(d => d >= fDate);
+                startIndex = dates.findIndex(d => d >= fDate.getTime());
                 if (startIndex === -1) startIndex = 0;
                 
-                let endIdx = dates.findIndex(d => d > tDate);
+                let endIdx = dates.findIndex(d => d > tDate.getTime());
                 endIndex = endIdx === -1 ? dates.length - 1 : Math.max(0, endIdx - 1);
                 
                 if (endIndex < startIndex) endIndex = startIndex;
@@ -1416,7 +1419,6 @@
                 loadRealAssetSeries(assetName);
             }
             
-            // Toggles y Selectores
             const sEma21 = document.getElementById('toggle-ema21').checked;
             const sSma50 = document.getElementById('toggle-sma50').checked;
             const sSma200 = document.getElementById('toggle-sma200').checked;
@@ -1425,7 +1427,6 @@
             const chartType = document.getElementById('ind-chart-type').value;
             const subPanelType = document.getElementById('ind-sub-panel').value;
 
-            // Actualizar leyenda superior de medias móviles y etiqueta del sub-panel
             const legendContainer = document.getElementById('ind-custom-legend');
             if (legendContainer) {
                 let legendItems = `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#3B82F6]"></div><span class="text-slate-200 font-semibold">Precio ${assetName}</span></div>`;
@@ -1451,14 +1452,12 @@
             const datasets = [];
             const visibleYValues = [];
 
-            // Recolectar valores de precio visibles para escalar correctamente el eje Y
             filteredData.forEach(d => {
                 if (d.h != null) visibleYValues.push(d.h);
                 if (d.l != null) visibleYValues.push(d.l);
                 if (d.c != null) visibleYValues.push(d.c);
             });
 
-            // Dataset Principal (Velas o Línea)
             if (chartType === 'candlestick') {
                 datasets.push({
                     label: `Precio ${assetName}`,
@@ -1516,7 +1515,6 @@
                 datasets.push({ type: 'line', label: 'BB Low', data: bbLowSlice, borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
             }
 
-            // Señales de Trading
             const visibleBuy = signalsBuy.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
             const visibleSell = signalsSell.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
             visibleBuy.forEach(s => { if (s.y != null) visibleYValues.push(s.y); });
@@ -1533,7 +1531,6 @@
                 backgroundColor: '#EF4444', pointStyle: 'triangle', rotation: 180, radius: 7, hoverRadius: 9, yAxisID: 'y'
             });
 
-            // Calcular límites explícitos del eje Y para evitar recortes en modo Velas Japonesas
             let yAxisMin = undefined;
             let yAxisMax = undefined;
             if (visibleYValues.length > 0) {
@@ -1544,7 +1541,6 @@
                 yAxisMax = rawMax + pad;
             }
 
-            // Sub-Panel Inferior
             let customAnnotations = {};
             if (subPanelType === 'vol') {
                 const volData = dummyVol.slice(start, end + 1);
@@ -1568,7 +1564,6 @@
                 customAnnotations.rsi30 = { type: 'line', yMin: 30, yMax: 30, yScaleID: 'ySub', borderColor: 'rgba(16, 185, 129, 0.4)', borderDash: [4, 4], borderWidth: 1 };
             }
 
-            // Etiqueta Ultimo Precio (clip: false para que no se corte en el borde derecho)
             const validBars = filteredData.filter(d => d.c != null);
             const lastValidBar = validBars.length > 0 ? validBars[validBars.length - 1] : null;
             const lastPrice = lastValidBar ? lastValidBar.c : 0;
@@ -1658,7 +1653,6 @@
             });
         }
 
-        // Restaurar valores del último cierre al salir del área del gráfico individual
         const indCanvasEl = document.getElementById('chartIndividual');
         indCanvasEl.addEventListener('mouseleave', () => updateIndividualStatusBar(currentIndEnd, true));
         indCanvasEl.addEventListener('touchend', () => updateIndividualStatusBar(currentIndEnd, true));
@@ -1740,19 +1734,29 @@
             const lastZ = lastZPt.y;
             const lastRatio = lastRPt.y;
 
+            // Escala dinámica del Z-Score para que nunca se recorte si supera ±3.5
+            let zMinLimit = -3.5;
+            let zMaxLimit = 3.5;
+            if (validZ.length > 0) {
+                const rawMinZ = Math.min(...validZ.map(p => p.y));
+                const rawMaxZ = Math.max(...validZ.map(p => p.y));
+                zMinLimit = Math.min(-3.5, Math.floor((rawMinZ - 0.3) * 2) / 2);
+                zMaxLimit = Math.max(3.5, Math.ceil((rawMaxZ + 0.3) * 2) / 2);
+            }
+
             const spreadAnnotations = {
                 boxAbove2: {
                     type: 'box',
                     yScaleID: 'yZ',
                     yMin: 2,
-                    yMax: 4.5,
+                    yMax: zMaxLimit + 1,
                     backgroundColor: 'rgba(239, 68, 68, 0.08)',
                     borderWidth: 0
                 },
                 boxBelowMinus2: {
                     type: 'box',
                     yScaleID: 'yZ',
-                    yMin: -4.5,
+                    yMin: zMinLimit - 1,
                     yMax: -2,
                     backgroundColor: 'rgba(16, 185, 129, 0.08)',
                     borderWidth: 0
@@ -1827,7 +1831,7 @@
                     xScaleID: 'x',
                     xValue: lastRPt.x,
                     yValue: lastRatio,
-                    content: lastRatio.toFixed(3),
+                    content: lastRatio.toFixed(lastRatio >= 100 ? 1 : 3),
                     backgroundColor: '#A78BFA',
                     color: '#0B1120',
                     font: { size: 10, family: 'Inter', weight: 'bold' },
@@ -1899,32 +1903,33 @@
                                 maxTicksLimit: window.innerWidth < 768 ? 5 : 12
                             }
                         },
-                        yZ: {
-                            type: 'linear',
-                            position: 'left',
-                            stack: 'spreadGroup',
-                            stackWeight: 65,
-                            min: -3.5,
-                            max: 3.5,
-                            grid: { color: '#1F2937' },
-                            ticks: {
-                                color: '#9CA3AF',
-                                callback: function (val) {
-                                    return (val > 0 ? '+' : '') + val.toFixed(1);
-                                }
-                            }
-                        },
+                        // Chart.js apila ejes de abajo hacia arriba: yRatio va primero (35% inferior) y yZ segundo (65% superior)
                         yRatio: {
                             type: 'linear',
                             position: 'left',
                             stack: 'spreadGroup',
                             stackWeight: 35,
-                            offset: true,
                             grid: { color: '#1F2937' },
                             ticks: {
                                 color: '#9CA3AF',
                                 callback: function (val) {
-                                    return val.toFixed(2);
+                                    return Number(val).toFixed(val >= 100 ? 1 : 2);
+                                }
+                            }
+                        },
+                        yZ: {
+                            type: 'linear',
+                            position: 'left',
+                            stack: 'spreadGroup',
+                            stackWeight: 65,
+                            offset: true,
+                            min: zMinLimit,
+                            max: zMaxLimit,
+                            grid: { color: '#374151' },
+                            ticks: {
+                                color: '#9CA3AF',
+                                callback: function (val) {
+                                    return (val > 0 ? '+' : '') + Number(val).toFixed(1);
                                 }
                             }
                         }
@@ -1942,7 +1947,6 @@
             });
         }
 
-        // Restaurar valores del último cierre al salir del área del gráfico de spreads
         const spreadCanvasEl = document.getElementById('chartSpread');
         spreadCanvasEl.addEventListener('mouseleave', () => updateSpreadStatusBar(currentSpreadEnd, true));
         spreadCanvasEl.addEventListener('touchend', () => updateSpreadStatusBar(currentSpreadEnd, true));
@@ -2005,7 +2009,6 @@
             });
         });
 
-        // Popover del botón compacto "📅 Rango"
         const btnIndRange = document.getElementById('btn-ind-range');
         const indRangePopover = document.getElementById('ind-range-popover');
         const btnCloseIndRange = document.getElementById('btn-close-ind-range');
@@ -2177,7 +2180,9 @@
                     realTickersStore = payload.tickers;
 
                     if (payload.last_update) {
-                        document.getElementById('last-update').innerText = payload.last_update;
+                        const lastUpdateEl = document.getElementById('last-update');
+                        lastUpdateEl.innerText = payload.last_update;
+                        lastUpdateEl.className = 'text-lg font-semibold text-blue-400';
                     }
 
                     if (payload.matrices && payload.matrices.corr && payload.matrices.zscore) {
