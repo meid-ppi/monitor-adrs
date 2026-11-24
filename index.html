@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor ADRs | Dashboard</title>
+    
+    <!-- Fuentes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ppi: {
+                            bg: '#0B1120',      // Fondo super oscuro
+                            card: '#111827',    // Gris muy oscuro para tarjetas
+                            blue: '#1B365D',    // Azul corporativo principal
+                            light: '#2B4C7E',   // Azul secundario
+                            border: '#1F2937',  // Borde sutil
+                            text: '#D1D5DB',
+                        }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Luxon & Financial Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
+    <!-- Chart.js Annotations Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0B1120; color: #F3F4F6; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Custom Checkbox toggle */
+        .toggle-checkbox:checked { right: 0; border-color: #3B82F6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3B82F6; }
+
+        /* Custom Dark Scrollbar para el Modal */
+        .dark-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 #0B1120;
+        }
+        .dark-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .dark-scrollbar::-webkit-scrollbar-track {
+            background: #0B1120;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #334155;
+            border-radius: 9999px;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 lg:p-8">
+
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-ppi-border pb-4">
+        <div class="flex items-center">
+            <h1 class="text-3xl font-bold text-white tracking-tight flex items-center">
+                <svg class="h-7 w-auto mr-4 shrink-0 select-none" viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo PPI">
+                    <text x="1" y="30" fill="#FFFFFF" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="34" letter-spacing="-1">pp</text>
+                    <text x="46" y="30" fill="#FFFFFF" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="34">ı</text>
+                    <circle cx="51.5" cy="7.5" r="3.3" fill="#1D9BF0"/>
+                </svg>
+                <span>Monitor ADRs</span>
+            </h1>
+        </div>
+        <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center gap-4">
+            <button id="btn-open-guide" type="button" class="bg-ppi-card hover:bg-ppi-blue/60 text-slate-200 hover:text-white border border-slate-700 hover:border-blue-500/50 px-3.5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm">
+                <span>📖</span>
+                <span>Guía y Glosario</span>
+            </button>
+            <div class="text-center sm:text-right">
+                <div class="text-sm text-slate-400">Última actualización (Yahoo Finance)</div>
+                <div class="text-lg font-semibold text-blue-400" id="last-update">Hoy, 18:30 ART</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- SECCIÓN 1: Alertas de Trading -->
+    <section class="mb-10">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 class="text-xl font-semibold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Alertas de Trading
+            </h2>
+
+            <!-- Píldoras de Filtro Rápido -->
+            <div class="flex flex-wrap items-center gap-1.5" id="alert-filters">
+                <button type="button" class="alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-blue text-white border-blue-500/40" data-filter="all" data-active="true">Todas</button>
+                <button type="button" class="alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-card text-slate-400 border-slate-700 hover:text-white" data-filter="compra">Compra</button>
+                <button type="button" class="alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-card text-slate-400 border-slate-700 hover:text-white" data-filter="venta">Venta</button>
+                <button type="button" class="alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-card text-slate-400 border-slate-700 hover:text-white" data-filter="rv">Relative Value</button>
+            </div>
+        </div>
+
+        <!-- Grilla Responsive Adaptable (1 columna en móvil, auto-fill sin cortes en desktop) -->
+        <div id="alerts-grid" class="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            <!-- Alerta Compra Individual -->
+            <div onclick="navigateFromAlert('ind', 'GGAL')" data-category="compra" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">GGAL</span>
+                            <span class="text-xs text-slate-400 block">Grupo Fin. Galicia</span>
+                        </div>
+                        <span class="bg-green-500/10 text-green-400 border border-green-500/30 text-xs px-2 py-1 rounded font-semibold tracking-wide">COMPRA (TEND.)</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Precio > SMA 200. RSI(14) cruza nivel 40 al alza. RVOL = 1.35x.</p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Análisis Individual</span>
+                    <span>Ver gráfico →</span>
+                </div>
+            </div>
+
+            <!-- Alerta Compra Reversion -->
+            <div onclick="navigateFromAlert('ind', 'VIST')" data-category="compra" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">VIST</span>
+                            <span class="text-xs text-slate-400 block">Vista Energy</span>
+                        </div>
+                        <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-2 py-1 rounded font-semibold tracking-wide">COMPRA (REV.)</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Cierre debajo BB Inferior con RSI < 30. RVOL en 1.8x.</p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Análisis Individual</span>
+                    <span>Ver gráfico →</span>
+                </div>
+            </div>
+
+            <!-- Alerta Venta -->
+            <div onclick="navigateFromAlert('ind', 'MELI')" data-category="venta" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">MELI</span>
+                            <span class="text-xs text-slate-400 block">MercadoLibre</span>
+                        </div>
+                        <span class="bg-red-500/10 text-red-400 border border-red-500/30 text-xs px-2 py-1 rounded font-semibold tracking-wide">VENTA</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Precio cruza hacia abajo SMA 50. RSI > 75 y MACD en negativo.</p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Análisis Individual</span>
+                    <span>Ver gráfico →</span>
+                </div>
+            </div>
+
+            <!-- Alerta RV Watchlist -->
+            <div onclick="navigateFromAlert('rv', 'BMA', 'BBAR')" data-category="rv" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">BMA / BBAR</span>
+                            <span class="text-xs text-slate-400 block">Correlación: 0.82</span>
+                        </div>
+                        <span class="bg-orange-500/10 text-orange-400 border border-orange-500/30 text-xs px-2 py-1 rounded font-semibold tracking-wide">WATCHLIST</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Z-Score alcanza -2.1. Esperando reversión a la media.</p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Relative Value</span>
+                    <span>Ver spread →</span>
+                </div>
+            </div>
+
+            <!-- Alerta RV Rotacion -->
+            <div onclick="navigateFromAlert('rv', 'PAM', 'CEPU')" data-category="rv" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">PAM / CEPU</span>
+                            <span class="text-xs text-slate-400 block">Correlación: 0.88</span>
+                        </div>
+                        <span class="bg-blue-500/10 text-blue-400 border border-blue-500/30 text-xs px-2 py-1 rounded font-semibold tracking-wide">ROTACIÓN</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Z-Score cruza debajo de +2.0. <strong class="text-white">Short PAM, Long CEPU.</strong></p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Relative Value</span>
+                    <span>Ver spread →</span>
+                </div>
+            </div>
+            
+            <!-- Alerta RV Stop-Loss -->
+            <div onclick="navigateFromAlert('rv', 'YPF', 'VIST')" data-category="rv" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">YPF / VIST</span>
+                            <span class="text-xs text-slate-400 block">Correlación: 0.79</span>
+                        </div>
+                        <span class="bg-red-600/20 text-red-500 border border-red-500/40 text-xs px-2 py-1 rounded font-semibold tracking-wide">STOP-LOSS</span>
+                    </div>
+                    <p class="text-sm text-slate-300">Z-Score superó +3.0. Invalida media-reversión por evento fundamental.</p>
+                </div>
+                <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                    <span>Relative Value</span>
+                    <span>Ver spread →</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="alerts-empty-msg" class="hidden bg-ppi-card border border-ppi-border rounded-xl p-6 text-center text-sm text-slate-400">
+            No hay alertas activas en esta categoría para la rueda actual.
+        </div>
+    </section>
+
+    <!-- Datalist global con los 17 ADRs válidos -->
+    <datalist id="adr-datalist">
+        <option value="GGAL">Grupo Financiero Galicia (Nasdaq)</option>
+        <option value="BMA">Banco Macro (NYSE)</option>
+        <option value="BBAR">Banco BBVA Argentina (NYSE)</option>
+        <option value="SUPV">Grupo Supervielle (NYSE)</option>
+        <option value="YPF">YPF S.A. (NYSE)</option>
+        <option value="PAM">Pampa Energía (NYSE)</option>
+        <option value="VIST">Vista Energy (NYSE)</option>
+        <option value="TGS">Transportadora de Gas del Sur (NYSE)</option>
+        <option value="CEPU">Central Puerto (NYSE)</option>
+        <option value="EDN">Edenor (NYSE)</option>
+        <option value="MELI">MercadoLibre (Nasdaq)</option>
+        <option value="GLOB">Globant (NYSE)</option>
+        <option value="TEO">Telecom Argentina (NYSE)</option>
+        <option value="LOMA">Loma Negra (NYSE)</option>
+        <option value="IRS">IRSA (NYSE)</option>
+        <option value="CRESY">Cresud (Nasdaq)</option>
+        <option value="CAAP">Corporación América Airports (NYSE)</option>
+    </datalist>
+
+    <!-- SECCIÓN 2: Análisis Técnico Individual -->
+    <section id="section-individual" class="mb-10 bg-ppi-card p-6 rounded-xl border border-ppi-border shadow-xl">
+        <h2 class="text-xl font-semibold mb-6 text-white border-b border-ppi-border pb-2">Análisis Técnico Individual</h2>
+
+        <!-- Botón desplegable para móvil -->
+        <button id="btn-toggle-ind-filters" class="md:hidden w-full bg-[#1F2937] border border-slate-700 text-white text-sm font-medium p-3 rounded-lg mb-4 flex justify-between items-center shadow-lg">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                Filtros / Indicadores
+            </span>
+            <svg id="icon-ind-filters" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+
+        <!-- Controles superiores -->
+        <div id="ind-filters-container" class="hidden md:flex flex-col gap-5 mb-6 w-full transition-all">
+            <div class="flex flex-col lg:flex-row justify-between gap-4 items-start lg:items-end">
+                <!-- Buscador de Activo + Tipo de Gráfico + Sub-panel -->
+                <div class="flex flex-wrap gap-3 w-full lg:w-auto items-end">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Activo (ADR)</label>
+                        <input type="text" id="ind-asset" list="adr-datalist" value="GGAL" placeholder="Buscar ADR..." class="bg-[#1F2937] border border-slate-700 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-36 p-2.5 outline-none uppercase placeholder:normal-case transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Visualización</label>
+                        <select id="ind-chart-type" class="bg-[#1F2937] border border-slate-700 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none">
+                            <option value="line">Línea</option>
+                            <option value="candlestick">Velas Japonesas</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Sub-Panel Inferior</label>
+                        <select id="ind-sub-panel" class="bg-[#1F2937] border border-slate-700 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none">
+                            <option value="vol">Volumen (RVOL)</option>
+                            <option value="rsi">RSI (14)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Selectores de Fecha y Períodos Rápidos -->
+                <div class="flex items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+                    <div class="flex bg-[#1F2937] rounded-lg border border-slate-700 p-1">
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="1W">1W</button>
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="1M">1M</button>
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="YTD">YTD</button>
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="1Y" data-active="true">1Y</button>
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="5Y">5Y</button>
+                        <button type="button" class="time-btn-ind px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="MAX" title="Desde 2016">MAX</button>
+                    </div>
+
+                    <div class="relative">
+                        <button type="button" id="btn-ind-range" class="bg-[#1F2937] hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white data-[active=true]:border-blue-500/40 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5">
+                            <span>📅</span>
+                            <span>Rango</span>
+                        </button>
+                        <div id="ind-range-popover" class="hidden absolute right-0 mt-2 z-30 bg-slate-900 border border-slate-700 rounded-xl p-3.5 shadow-2xl w-64 space-y-3">
+                            <div class="text-xs font-semibold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center justify-between">
+                                <span>Rango personalizado</span>
+                                <button type="button" id="btn-close-ind-range" class="text-slate-400 hover:text-white text-xs">✕</button>
+                            </div>
+                            <div class="space-y-2 text-xs">
+                                <div>
+                                    <label class="block text-slate-400 mb-1">Desde:</label>
+                                    <input type="date" id="ind-date-from" class="w-full bg-[#1F2937] border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-slate-400 mb-1">Hasta:</label>
+                                    <input type="date" id="ind-date-to" class="w-full bg-[#1F2937] border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checkboxes de Indicadores -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#0B1120] p-3.5 rounded-lg border border-slate-800">
+                <div>
+                    <span class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Superpuestos en Precio (Tendencia y Volatilidad)</span>
+                    <div class="flex flex-wrap gap-4 text-xs text-slate-300">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-ema21" checked class="rounded bg-slate-800 border-slate-600 text-pink-500 focus:ring-0">
+                            <span class="text-pink-400 font-medium">EMA 21</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-sma50" checked class="rounded bg-slate-800 border-slate-600 text-amber-500 focus:ring-0">
+                            <span class="text-amber-400 font-medium">SMA 50</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-sma200" checked class="rounded bg-slate-800 border-slate-600 text-red-500 focus:ring-0">
+                            <span class="text-red-400 font-medium">SMA 200</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-bb" class="rounded bg-slate-800 border-slate-600 text-purple-500 focus:ring-0">
+                            <span class="text-purple-400 font-medium">Bandas Bollinger (20, 2)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Métricas en Data Panel (Momentum, Volumen y Riesgo)</span>
+                    <div class="flex flex-wrap gap-4 text-xs text-slate-300">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-rsi" checked class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-0">
+                            <span>RSI (14)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-macd" checked class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-0">
+                            <span>MACD</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-vol" checked class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-0">
+                            <span>Volumen</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="toggle-atr" checked class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-0">
+                            <span>ATR (14)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Individual Apilado (70% Precio arriba / 30% Sub-panel abajo) -->
+        <div class="relative w-full h-[630px] bg-[#0B1120] rounded-lg border border-slate-800 p-0 flex flex-col overflow-hidden">
+            
+            <!-- Cabecera Integrada Estilo TradingView (Leyenda de Medias + Barra de Datos Fija) -->
+            <div class="w-full px-3.5 pt-2.5 pb-2 border-b border-slate-800/80 bg-[#0B1120] z-10 flex flex-col gap-1.5 shrink-0">
+                <!-- Leyenda Dinámica de Precio y Medias Móviles -->
+                <div id="ind-custom-legend" class="flex flex-wrap items-center gap-4 text-xs font-medium"></div>
+
+                <!-- Barra de Datos Horizontal Fija -->
+                <div id="ind-data-bar" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs bg-slate-900/50 border border-slate-800/70 rounded-md px-2.5 py-1.5">
+                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs">
+                        <span class="text-slate-200 font-medium flex items-center gap-1">
+                            <span>📅</span>
+                            <span id="dp-date">-</span>
+                            <span id="dp-ind-latest-badge" class="ml-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">Último cierre</span>
+                        </span>
+                        <span class="text-slate-700">|</span>
+                        <span class="text-slate-400">Cierre: <strong class="font-mono font-semibold text-white" id="dp-price">-</strong></span>
+                        <span class="text-slate-700" id="dp-sep-rsi">|</span>
+                        <span class="text-slate-400" id="dp-wrap-rsi">RSI (14): <strong class="font-mono font-semibold text-indigo-300" id="dp-rsi">-</strong></span>
+                        <span class="text-slate-700" id="dp-sep-macd">|</span>
+                        <span class="text-slate-400" id="dp-wrap-macd">MACD: <strong class="font-mono font-semibold text-sky-300" id="dp-macd">-</strong></span>
+                        <span class="text-slate-700" id="dp-sep-vol">|</span>
+                        <span class="text-slate-400" id="dp-wrap-vol">Volumen: <strong class="font-mono font-semibold text-amber-300" id="dp-vol">-</strong></span>
+                        <span class="text-slate-700" id="dp-sep-atr">|</span>
+                        <span class="text-slate-400" id="dp-wrap-atr">ATR (14): <strong class="font-mono font-semibold text-rose-300" id="dp-atr">-</strong></span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 italic ml-auto">Datos calculados post-cierre</div>
+                </div>
+            </div>
+
+            <!-- Área de Gráficos Apilados (70% Precio arriba / 30% Sub-panel abajo) -->
+            <div class="relative flex-1 w-full min-h-0">
+                <!-- Separador visual claro entre Precio (70%) y Sub-panel (30%) -->
+                <div class="absolute top-[70%] left-0 right-0 h-1 bg-slate-800 border-t border-slate-700 z-0 pointer-events-none"></div>
+
+                <!-- Etiqueta discreta del Sub-Panel Inferior -->
+                <div id="ind-subpanel-badge" class="absolute top-[72%] left-[64px] flex items-center gap-3 text-[11px] font-medium z-10 bg-[#0B1120]/80 px-2 py-1 rounded backdrop-blur pointer-events-none text-slate-300">
+                    Volumen (RVOL &gt; 1.2x destacado)
+                </div>
+
+                <div class="w-full h-full p-2 pb-0">
+                    <canvas id="chartIndividual"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN MATRICES: Correlación y Z-Score -->
+    <section class="mb-10 bg-ppi-card p-6 rounded-xl border border-ppi-border shadow-xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-ppi-border pb-4">
+            <h2 class="text-xl font-semibold text-white">Matrices de Valor Relativo (Todos vs Todos)</h2>
+            <div class="mt-4 md:mt-0 flex items-center">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-corr-filter" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 relative"></div>
+                    <span class="ml-3 text-sm font-medium text-slate-300">Ocultar pares con correlación < 0.75</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Matriz Correlación -->
+            <div class="w-full">
+                <h3 class="text-md font-medium text-slate-300 mb-3">Correlación (60 ruedas)</h3>
+                <div class="overflow-x-auto border border-slate-700 rounded-lg custom-scrollbar">
+                    <table class="w-full text-xs text-center border-collapse min-w-max" id="matrix-corr">
+                        <!-- Generado via JS -->
+                    </table>
+                </div>
+            </div>
+
+            <!-- Matriz Z-Score -->
+            <div class="w-full">
+                <h3 class="text-md font-medium text-slate-300 mb-3">Z-Score del Spread</h3>
+                <div class="overflow-x-auto border border-slate-700 rounded-lg custom-scrollbar relative">
+                    <table class="w-full text-xs text-center border-collapse min-w-max" id="matrix-zscore">
+                        <!-- Generado via JS -->
+                    </table>
+                </div>
+                <div class="mt-3 text-[11px] text-slate-400 bg-[#0B1120] p-2 rounded border border-slate-800 text-center">
+                    <span class="text-emerald-400 font-bold">-3 (Fila barata / Comprar Fila)</span> 
+                    <span class="mx-2 text-slate-500">a</span> 
+                    <span class="text-red-400 font-bold">+3 (Fila cara / Vender Fila)</span>
+                </div>
+            </div>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-4 italic">Haz clic en cualquier celda para cargar el par en el gráfico inferior.</p>
+    </section>
+
+    <!-- Tooltip Flotante para Matrices -->
+    <div id="matrix-tooltip" class="absolute hidden bg-slate-900 border border-slate-600 shadow-2xl p-3 rounded-lg pointer-events-none z-50 backdrop-blur-sm text-xs text-white"></div>
+
+    <!-- SECCIÓN 3: Análisis de Valor Relativo -->
+    <section id="section-rv" class="mb-10 bg-ppi-card p-6 rounded-xl border border-ppi-border shadow-xl">
+        <h2 class="text-xl font-semibold mb-6 text-white border-b border-ppi-border pb-2">Relative Value: Z-Score de Log-Ratio (60 ruedas)</h2>
+        
+        <!-- Controles Spread Mobile Toggle -->
+        <button id="btn-toggle-spread-filters" class="md:hidden w-full bg-[#1F2937] border border-slate-700 text-white text-sm font-medium p-3 rounded-lg mb-4 flex justify-between items-center shadow-lg">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                Filtros de Período y Activos
+            </span>
+            <svg id="icon-spread-filters" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+
+        <!-- Controles -->
+        <div id="spread-filters-container" class="hidden md:flex flex-col lg:flex-row gap-6 mb-6 justify-between items-start lg:items-center w-full transition-all">
+            
+            <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto items-end">
+                <!-- Selector ADR A -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Activo A (Long)</label>
+                    <input type="text" id="spread-asset-a" list="adr-datalist" value="BMA" placeholder="Buscar ADR..." class="bg-[#1F2937] border border-slate-700 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 outline-none uppercase placeholder:normal-case transition-colors">
+                </div>
+                
+                <div class="text-slate-500 font-bold pb-3 px-2 text-xl">VS</div>
+
+                <!-- Selector ADR B -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Activo B (Short)</label>
+                    <input type="text" id="spread-asset-b" list="adr-datalist" value="BBAR" placeholder="Buscar ADR..." class="bg-[#1F2937] border border-slate-700 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 outline-none uppercase placeholder:normal-case transition-colors">
+                </div>
+            </div>
+            
+            <!-- Badge Dinámico de Correlación -->
+            <div id="correlation-badge" class="w-full lg:w-auto flex-grow flex justify-center lg:justify-start px-0 lg:px-4 mt-4 lg:mt-0 items-end pb-1">
+                <!-- Se inyecta via JS -->
+            </div>
+
+            <!-- Botones de Tiempo Spread -->
+            <div class="mt-4 lg:mt-0 flex flex-col items-end gap-2">
+                <div class="flex flex-col sm:flex-row items-center gap-2 text-xs w-full justify-end">
+                    <div class="flex items-center gap-1">
+                        <span class="text-slate-400">Desde:</span>
+                        <input type="date" id="spread-date-from" class="bg-[#1F2937] border border-slate-700 text-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 w-[120px]">
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-slate-400">Hasta:</span>
+                        <input type="date" id="spread-date-to" class="bg-[#1F2937] border border-slate-700 text-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 w-[120px]">
+                    </div>
+                </div>
+                <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider self-end sm:self-start">Período Predefinido</label>
+                <div class="flex bg-[#1F2937] rounded-lg border border-slate-700 p-1 w-full justify-between">
+                    <button class="time-btn-spread px-3 py-1 text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="1M">1M</button>
+                    <button class="time-btn-spread px-3 py-1 text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="YTD">YTD</button>
+                    <button class="time-btn-spread px-3 py-1 text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="1Y" data-active="true">1Y</button>
+                    <button class="time-btn-spread px-3 py-1 text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="5Y">5Y</button>
+                    <button class="time-btn-spread px-3 py-1 text-sm rounded text-slate-400 hover:text-white data-[active=true]:bg-ppi-blue data-[active=true]:text-white transition-all" data-period="MAX" title="Desde 2016">MAX</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Contenedor Apilado (65% Z-Score arriba / 35% Ratio Nominal abajo) -->
+        <div class="relative w-full h-[660px] bg-[#0B1120] rounded-lg border border-slate-800 p-0 flex flex-col overflow-hidden">
+            
+            <!-- Cabecera Integrada Estilo TradingView (Leyenda + Barra de Datos Fija) -->
+            <div class="w-full px-3.5 pt-2.5 pb-2 border-b border-slate-800/80 bg-[#0B1120] z-10 flex flex-col gap-1.5 shrink-0">
+                <!-- Leyenda Superior Panel Z-Score -->
+                <div class="flex flex-wrap items-center gap-4 text-xs font-medium">
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#38BDF8]"></div><span class="text-slate-200 font-semibold">Z-Score Log</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0 border-t border-dashed border-[#EF4444]"></div><span class="text-slate-300">+2 SD</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0 border-t border-dashed border-[#10B981]"></div><span class="text-slate-300">-2 SD</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0 border-t border-dashed border-[#6B7280]"></div><span class="text-slate-400">Media Z (0)</span></div>
+                </div>
+
+                <!-- Barra de Datos Horizontal Fija -->
+                <div id="spread-data-bar" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs bg-slate-900/50 border border-slate-800/70 rounded-md px-2.5 py-1.5">
+                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs">
+                        <span class="text-slate-200 font-medium flex items-center gap-1">
+                            <span>📅</span>
+                            <span id="sp-date">-</span>
+                            <span id="sp-latest-badge" class="ml-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">Último cierre</span>
+                        </span>
+                        <span class="text-slate-700">|</span>
+                        <span class="text-slate-400">Z-Score: <strong class="font-mono font-semibold text-sky-400" id="sp-zscore">-</strong></span>
+                        <span class="text-slate-700">|</span>
+                        <span class="text-slate-400">Ratio Nom: <strong class="font-mono font-semibold text-purple-300" id="sp-ratio">-</strong></span>
+                        <span class="text-slate-700">|</span>
+                        <span class="text-slate-400">SMA 60: <strong class="font-mono font-semibold text-amber-300" id="sp-sma">-</strong></span>
+                        <span class="text-slate-700">|</span>
+                        <span class="text-slate-400">Desvío: <strong class="font-mono font-semibold text-white" id="sp-diff">-</strong></span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 italic ml-auto">Datos calculados post-cierre</div>
+                </div>
+            </div>
+
+            <!-- Área de Gráficos Apilados -->
+            <div class="relative flex-1 w-full min-h-0">
+                <!-- Separador visual claro entre Z-Score (65%) y Ratio Nominal (35%) -->
+                <div class="absolute top-[65%] left-0 right-0 h-1 bg-slate-800 border-t border-slate-700 z-0 pointer-events-none"></div>
+
+                <!-- Leyenda Inferior Panel Ratio Nominal -->
+                <div class="absolute top-[66.5%] left-[64px] flex items-center gap-4 text-[11px] font-medium z-10 bg-[#0B1120]/80 px-2 py-1 rounded backdrop-blur pointer-events-none">
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#A78BFA]"></div><span class="text-slate-200">Ratio Nominal</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-3 h-0 border-t border-dashed border-[#FCD34D]"></div><span class="text-slate-300">SMA 60 Ratio</span></div>
+                </div>
+
+                <div class="w-full h-full p-2 pb-0">
+                    <canvas id="chartSpread"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="text-center text-slate-500 text-sm mt-12 pb-8 border-t border-ppi-border pt-4">
+        &copy; 2026 Monitor ADRs. Creado para análisis interno. Generado vía GitHub Actions & yfinance.
+    </footer>
+
+    <!-- MODAL / DRAWER: Guía y Glosario -->
+    <div id="guide-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex justify-end" role="dialog" aria-modal="true" aria-labelledby="guide-modal-title">
+        <div id="guide-drawer" class="w-full md:w-[640px] lg:w-[700px] h-full bg-ppi-card border-l border-slate-700 shadow-2xl flex flex-col">
+            
+            <!-- Cabecera del Drawer -->
+            <div class="flex items-center justify-between px-5 py-4 border-b border-ppi-border bg-[#0B1120]">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-xl">📖</span>
+                    <div>
+                        <h2 id="guide-modal-title" class="text-lg font-bold text-white leading-tight">Guía y Glosario Operativo</h2>
+                        <p class="text-xs text-slate-400">Documentación de uso, indicadores técnicos y modelos de Relative Value</p>
+                    </div>
+                </div>
+                <button id="btn-close-guide" type="button" aria-label="Cerrar guía" class="text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 p-2 rounded-lg transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Buscador Rápido y Pestañas -->
+            <div class="px-5 pt-4 pb-3 border-b border-ppi-border bg-ppi-card space-y-3">
+                <!-- Buscador -->
+                <div class="relative">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="guide-search" placeholder="Buscar indicador o concepto (ej. Z-Score, RVOL, Bollinger, ATR)..." class="w-full bg-[#0B1120] border border-slate-700 focus:border-blue-500 text-white text-sm rounded-lg pl-9 pr-8 py-2 outline-none transition-colors placeholder:text-slate-500">
+                    <button id="btn-clear-guide-search" type="button" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800">Limpiar</button>
+                </div>
+
+                <!-- Navegación de Pestañas -->
+                <div id="guide-tabs-nav" class="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                    <button type="button" class="guide-tab-btn px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border transition-all whitespace-nowrap bg-ppi-blue text-white border-blue-500/40" data-tab="uso" data-active="true">
+                        1. ¿Cómo usar esta plataforma?
+                    </button>
+                    <button type="button" class="guide-tab-btn px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border transition-all whitespace-nowrap bg-[#0B1120] text-slate-400 border-slate-800 hover:text-white" data-tab="individual">
+                        2. Análisis Individual
+                    </button>
+                    <button type="button" class="guide-tab-btn px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border transition-all whitespace-nowrap bg-[#0B1120] text-slate-400 border-slate-800 hover:text-white" data-tab="rv">
+                        3. Relative Value (Spreads)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenido Scrolleable -->
+            <div id="guide-content-scroll" class="dark-scrollbar flex-1 overflow-y-auto px-5 pt-5 pb-8 space-y-4">
+                
+                <!-- Mensaje sin resultados -->
+                <div id="guide-no-results" class="hidden text-center py-10 text-slate-400 text-sm">
+                    No se encontraron términos que coincidan con tu búsqueda.
+                </div>
+
+                <!-- PESTAÑA 1: ¿Cómo usar esta plataforma? -->
+                <div class="guide-tab-panel space-y-4" data-panel="uso">
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-2" data-section="¿Cómo usar esta plataforma?">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                Alertas de Trading
+                            </h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Uso de Plataforma</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Funciona como un escáner automático que se actualiza post-cierre (<strong class="text-white font-medium">18:30 ART</strong>) evaluando los 17 ADRs individuales y sus 136 cruces posibles para detectar oportunidades accionables del día sin tener que revisar activo por activo. Agrupa señales de <strong class="text-emerald-400 font-semibold">COMPRA</strong>, <strong class="text-red-400 font-semibold">VENTA</strong> y rotaciones de <strong class="text-sky-400 font-semibold">Relative Value</strong> (<span class="text-slate-200">Watchlist, Rotación y Stop-Loss</span>). Podés filtrarlas por categoría y hacer clic sobre cualquier tarjeta para abrir directamente el gráfico correspondiente.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-2" data-section="¿Cómo usar esta plataforma?">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-blue-400 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                Análisis Individual
+                            </h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Uso de Plataforma</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Sirve para detectar puntos de entrada y salida en un ADR puntual combinando tendencia, momentum y volumen. Las señales de <strong class="text-emerald-400 font-semibold">COMPRA</strong> buscan subidas confirmadas en tendencia alcista (<code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">Precio &gt; SMA 200</code>) o rebotes por sobreventa extrema. Las señales de <strong class="text-red-400 font-semibold">VENTA</strong> alertan pérdida de tendencia o agotamiento.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-2" data-section="¿Cómo usar esta plataforma?">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-sky-400 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                                Relative Value (Spreads)
+                            </h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Uso de Plataforma</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Compara dos ADRs que suelen moverse juntos (ej. dos bancos o dos energéticas) para detectar cuando uno quedó temporalmente caro respecto al otro y aprovechar la <strong class="text-white font-semibold">"reversión a la media"</strong> (vender el caro / comprar el barato).
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-ppi-blue/20 border border-blue-500/30 rounded-xl p-4 text-xs text-slate-300 space-y-1.5" data-section="¿Cómo usar esta plataforma?">
+                        <div class="font-semibold text-blue-300">💡 Tip rápido de navegación</div>
+                        <p>Podés hacer clic sobre cualquier tarjeta de <strong>Alertas de Trading</strong> o celda de las <strong>Matrices de Correlación y Z-Score</strong> para cargar automáticamente ese activo o par en el gráfico inferior, o recorrer las curvas para ver los valores exactos de cada rueda en la barra superior de datos.</p>
+                    </div>
+                </div>
+
+                <!-- PESTAÑA 2: Glosario de Análisis Individual -->
+                <div class="guide-tab-panel hidden space-y-3" data-panel="individual">
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">EMA 21 / SMA 50 / SMA 200 <span class="text-xs font-normal text-amber-400 ml-1">(Medias Móviles)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Muestran el precio promedio de las últimas 21, 50 o 200 ruedas. Definen la tendencia de corto, mediano y largo plazo.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">Bandas de Bollinger <span class="text-xs font-normal text-purple-400 ml-1">(20, 2)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Canal de volatilidad alrededor del precio compuesto por una línea central y dos bandas externas. El <strong class="text-white">20</strong> representa el promedio móvil simple (SMA) de las últimas 20 ruedas (línea media), mientras que el <strong class="text-white">2</strong> indica la cantidad de desvíos estándar hacia arriba y hacia abajo que determinan el ancho del canal. Cuando el precio perfora la banda inferior suele indicar sobreventa extrema; cuando las bandas se estrechan mucho anticipan un movimiento fuerte.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">RSI <span class="text-xs font-normal text-indigo-400 ml-1">(14 días)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Mide la fuerza y velocidad del movimiento (0 a 100). Debajo de 30 indica sobreventa (posible rebote); arriba de 70-75 indica sobrecompra (posible toma de ganancias).
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">MACD</h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Indicador de momentum que muestra cambios en la aceleración de la tendencia mediante el cruce de medias y su histograma.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">RVOL <span class="text-xs font-normal text-orange-400 ml-1">(Volumen Relativo)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Compara el volumen operado hoy contra el promedio de las últimas 20 ruedas. Un <code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">RVOL &gt; 1.2</code> o <code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">1.5</code> confirma interés institucional detrás del movimiento.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Análisis Individual">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">ATR <span class="text-xs font-normal text-rose-400 ml-1">(14)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Análisis Individual</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            <em>Average True Range</em>. Mide cuántos dólares se mueve en promedio el ADR por día (volatilidad real), útil para calcular distancias de Stop-Loss.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- PESTAÑA 3: Glosario de Relative Value (Spreads) -->
+                <div class="guide-tab-panel hidden space-y-3" data-panel="rv">
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-1.5" data-section="Relative Value">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">Correlación <span class="text-xs font-normal text-emerald-400 ml-1">(60 ruedas)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Relative Value</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Mide qué tan sincronizados se mueven dos ADRs (de -1 a +1). Exigimos <code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-emerald-400">&gt; 0.75</code> para considerar que un par es válido para arbitraje estadístico.
+                        </p>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-2" data-section="Relative Value">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">Log-Ratio / Ratio Nominal</h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Relative Value</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Ambos miden el precio relativo entre el Activo A y el Activo B, pero cumplen funciones distintas en la plataforma:
+                        </p>
+                        <ul class="space-y-1.5 text-xs text-slate-300 border-t border-slate-800/80 pt-2">
+                            <li>
+                                <strong class="text-purple-400">Ratio Nominal</strong> (<code class="text-[11px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">Precio A / Precio B</code>): Relación lineal directa que indica cuántas acciones de B equivale 1 acción de A. Se grafica en el panel inferior como referencia visual de precios.
+                            </li>
+                            <li>
+                                <strong class="text-sky-400">Log-Ratio</strong> (<code class="text-[11px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">ln(Precio A / Precio B)</code>): Aplica el logaritmo natural para hacer simétricas las variaciones porcentuales al alza y a la baja. <strong class="text-white">El sistema utiliza el Log-Ratio para calcular el Z-Score</strong>, evitando sesgos estadísticos cuando el spread se amplía.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-slate-800 rounded-xl p-4 space-y-3" data-section="Relative Value">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">Z-Score <span class="text-xs font-normal text-sky-400 ml-1">(Ventana fija 60 ruedas 1D)</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Relative Value</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Mide cuántos desvíos estándar se alejó el Log-Ratio respecto a su promedio móvil. Esta ventana de <strong class="text-white">60 ruedas está fijada en velas diarias (1D / cierres diarios)</strong> y no cambia al alternar el horizonte visual del gráfico (1M, YTD, 1Y, 5Y o MAX).
+                        </p>
+
+                        <!-- Indicador Visual Horizontal de Rangos del Z-Score -->
+                        <div class="bg-[#111827] border border-slate-800/90 rounded-lg p-3 space-y-1.5">
+                            <div class="flex justify-between items-center text-[10px] font-mono font-semibold">
+                                <span class="text-red-400">-3.0 SD</span>
+                                <span class="text-emerald-400">-2.0 SD</span>
+                                <span class="text-sky-400">0.0</span>
+                                <span class="text-orange-400">+2.0 SD</span>
+                                <span class="text-red-400">+3.0 SD</span>
+                            </div>
+
+                            <!-- Barra segmentada proporcional (-3 a +3) -->
+                            <div class="relative h-2.5 w-full rounded-full overflow-hidden flex bg-slate-900 border border-slate-700/80">
+                                <!-- Zona Invalidación Inferior (-3 a -2: 16.7%) -->
+                                <div class="w-[16.7%] h-full bg-red-600/75 border-r border-slate-950" title="Invalidación (< -3.0 SD)"></div>
+                                <!-- Zona Barato / Reversión Inferior (-2 a 0: 33.3%) -->
+                                <div class="w-[33.3%] h-full bg-gradient-to-r from-emerald-500/80 via-emerald-500/25 to-slate-700/40 border-r border-sky-400/70" title="Activo A Barato (-2.0 SD a 0.0)"></div>
+                                <!-- Zona Caro / Reversión Superior (0 a +2: 33.3%) -->
+                                <div class="w-[33.3%] h-full bg-gradient-to-r from-slate-700/40 via-orange-500/25 to-orange-500/80 border-r border-slate-950" title="Activo A Caro (0.0 a +2.0 SD)"></div>
+                                <!-- Zona Invalidación Superior (+2 a +3: 16.7%) -->
+                                <div class="w-[16.7%] h-full bg-red-600/75" title="Invalidación (> +3.0 SD)"></div>
+                            </div>
+
+                            <!-- Etiquetas operativas alineadas -->
+                            <div class="grid grid-cols-5 gap-1 text-[10px] leading-tight pt-0.5">
+                                <div class="text-left text-red-400/90 font-medium">Invalidación</div>
+                                <div class="text-left text-emerald-400 font-medium pl-1">Barato</div>
+                                <div class="text-center text-slate-300 font-medium">Media / Toma<br class="sm:hidden"> ganancia</div>
+                                <div class="text-right text-orange-400 font-medium pr-1">Caro</div>
+                                <div class="text-right text-red-400/90 font-medium">Invalidación</div>
+                            </div>
+                        </div>
+
+                        <ul class="space-y-2 text-xs text-slate-300 border-t border-slate-800 pt-2.5">
+                            <li class="flex items-start gap-2">
+                                <span class="bg-red-500/15 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-mono font-semibold shrink-0">Z &gt; +2.0</span>
+                                <span>El Activo A está estadísticamente <strong class="text-red-400">CARO</strong> respecto al B (posible rotación: vender A / comprar B).</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-mono font-semibold shrink-0">Z &lt; -2.0</span>
+                                <span>El Activo A está estadísticamente <strong class="text-emerald-400">BARATO</strong> respecto al B (posible rotación: comprar A / vender B).</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="bg-blue-500/15 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded font-semibold shrink-0">Rotación</span>
+                                <span>Se confirma cuando el Z-Score supera ±2.0 y luego vuelve a cruzar por debajo de ese umbral hacia <strong class="text-white">0.0</strong> (toma de ganancia en la media).</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="guide-item bg-[#0B1120] border border-red-900/40 rounded-xl p-4 space-y-1.5" data-section="Relative Value">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-red-400">Invalidación <span class="text-xs font-mono font-semibold text-red-300 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded ml-1">|Z| &gt; 3.0 SD</span></h3>
+                            <span class="guide-section-badge hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400">Relative Value</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            Si el Z-Score supera 3 desvíos estándar en cualquier dirección (<code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">&gt; +3.0</code> o <code class="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">&lt; -3.0</code>), la divergencia suele responder a una noticia fundamental específica de una empresa; se recomienda cortar pérdida y no operar la reversión. Antes de invalidar, conviene confirmar que el movimiento esté acompañado por <strong class="text-white">volumen real (RVOL elevado)</strong> para evitar falsas alarmas provocadas por baja liquidez o puntas abiertas en ciertos ADRs.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Lógica de Gráficos e Interactividad -->
+    <script>
+        // Configuración Global de Chart.js
+        Chart.defaults.color = '#9CA3AF';
+        Chart.defaults.borderColor = '#1F2937';
+        Chart.defaults.font.family = 'Inter';
+        
+        luxon.Settings.defaultLocale = "es";
+
+        let chartInd = null;
+        let chartRel = null;
+        let isRealDataLoaded = false;
+        let realTickersStore = {};
+
+        // Catálogo oficial de los 17 ADRs
+        const ADR_META = {
+            'GGAL': { name: 'Grupo Financiero Galicia', sector: 1 },
+            'BMA':  { name: 'Banco Macro', sector: 1 },
+            'BBAR': { name: 'Banco BBVA Argentina', sector: 1 },
+            'SUPV': { name: 'Grupo Supervielle', sector: 1 },
+            'YPF':  { name: 'YPF S.A.', sector: 2 },
+            'PAM':  { name: 'Pampa Energía', sector: 2 },
+            'VIST': { name: 'Vista Energy', sector: 2 },
+            'TGS':  { name: 'Transportadora de Gas del Sur', sector: 2 },
+            'CEPU': { name: 'Central Puerto', sector: 2 },
+            'EDN':  { name: 'Edenor', sector: 2 },
+            'MELI': { name: 'MercadoLibre', sector: 3 },
+            'GLOB': { name: 'Globant', sector: 3 },
+            'TEO':  { name: 'Telecom Argentina', sector: 4 },
+            'LOMA': { name: 'Loma Negra', sector: 4 },
+            'IRS':  { name: 'IRSA', sector: 4 },
+            'CRESY':{ name: 'Cresud', sector: 4 },
+            'CAAP': { name: 'Corporación América Airports', sector: 4 }
+        };
+        const validADRs = Object.keys(ADR_META);
+
+        // Arrays activos que alimentan los gráficos (se poblan desde datos_adrs.json o fallback)
+        let dates = [];
+        let fullDataInd = [];
+        let dummyRSI = [];
+        let dummyMACD = [];
+        let dummyVol = [];
+        let dummyATR = [];
+        let dummyVolSMA = [];
+        let precomputedInd = null;
+        let signalsBuy = [];
+        let signalsSell = [];
+
+        let fullZScore = [];
+        let fullRatio = [];
+        let fullRatioSMA = [];
+        let lastSpreadPairKey = '';
+
+        const matrixData = {};
+
+        // Funciones Cálculo de Medias y Bollinger (usadas en modo fallback y para Ratio Nominal)
+        function calculateMA(data, period, isEMA = false) {
+            if (!data || data.length === 0) return [];
+            let res = [];
+            let multiplier = 2 / (period + 1);
+            let prevEma = null;
+            let validCount = 0;
+
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].y == null) {
+                    res.push({x: data[i].x, y: null});
+                    continue;
+                }
+                validCount++;
+                if (isEMA) {
+                    if (prevEma == null) {
+                        prevEma = data[i].y;
+                        res.push({x: data[i].x, y: prevEma});
+                    } else {
+                        let ema = (data[i].y - prevEma) * multiplier + prevEma;
+                        prevEma = ema;
+                        res.push({x: data[i].x, y: ema});
+                    }
+                } else {
+                    if (validCount < period) {
+                        res.push({x: data[i].x, y: null});
+                        continue;
+                    }
+                    let sum = 0;
+                    let ok = true;
+                    for (let j = 0; j < period; j++) {
+                        if (data[i - j].y == null) { ok = false; break; }
+                        sum += data[i - j].y;
+                    }
+                    res.push({x: data[i].x, y: ok ? (sum / period) : null});
+                }
+            }
+            return res;
+        }
+
+        function calculateBollinger(data, period, multiplier) {
+            let upper = [], lower = [];
+            let sma = calculateMA(data, period);
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1 || sma[i].y == null) {
+                    upper.push({x: data[i].x, y: null});
+                    lower.push({x: data[i].x, y: null});
+                    continue;
+                }
+                let mean = sma[i].y;
+                let sumSq = 0;
+                for (let j = 0; j < period; j++) sumSq += Math.pow(data[i - j].y - mean, 2);
+                let stdDev = Math.sqrt(sumSq / period);
+                upper.push({x: data[i].x, y: mean + (stdDev * multiplier)});
+                lower.push({x: data[i].x, y: mean - (stdDev * multiplier)});
+            }
+            return { upper, lower };
+        }
+
+        // Inicializar datos de respaldo (en caso de abrir localmente sin datos_adrs.json)
+        function initFallbackData() {
+            const MOCK_DAYS = 1260;
+            let baseDate = new Date();
+            baseDate.setDate(baseDate.getDate() - Math.floor(MOCK_DAYS * 1.45));
+
+            dates = [];
+            let d = new Date(baseDate);
+            while (dates.length < MOCK_DAYS) {
+                if (d.getDay() !== 0 && d.getDay() !== 6) dates.push(new Date(d).getTime());
+                d.setDate(d.getDate() + 1);
+            }
+
+            let val = 25;
+            fullDataInd = dates.map(dt => {
+                val += (Math.random() - 0.5) * 1;
+                val += (30 - val) * 0.01;
+                let o = val + (Math.random() - 0.5) * 0.5;
+                let c = val + (Math.random() - 0.5) * 0.5;
+                let h = Math.max(o, c) + Math.random() * 0.3;
+                let l = Math.min(o, c) - Math.random() * 0.3;
+                return {x: dt, o: o, h: h, l: l, c: c, y: c};
+            });
+
+            dummyRSI = dates.map(dt => ({x: dt, y: 30 + Math.random() * 40}));
+            dummyMACD = dates.map(dt => ({x: dt, y: (Math.random() - 0.5) * 2}));
+            dummyVol = dates.map(dt => ({x: dt, y: Math.floor(Math.random() * 800000) + 200000}));
+            dummyATR = dates.map(dt => ({x: dt, y: 0.5 + Math.random() * 1.5}));
+            dummyVolSMA = calculateMA(dummyVol, 20);
+            precomputedInd = null;
+
+            signalsBuy = [];
+            signalsSell = [];
+            for (let i = 100; i < fullDataInd.length; i += Math.floor(Math.random() * 80) + 40) {
+                signalsBuy.push({x: fullDataInd[i].x, y: fullDataInd[i].l * 0.985});
+            }
+            for (let i = 140; i < fullDataInd.length; i += Math.floor(Math.random() * 80) + 40) {
+                signalsSell.push({x: fullDataInd[i].x, y: fullDataInd[i].h * 1.015});
+            }
+
+            validADRs.forEach(a => {
+                matrixData[a] = {};
+                validADRs.forEach(b => {
+                    if (a === b) {
+                        matrixData[a][b] = { corr: 1.0, z: 0.0 };
+                    } else if (matrixData[b] && matrixData[b][a]) {
+                        matrixData[a][b] = { corr: matrixData[b][a].corr, z: -matrixData[b][a].z };
+                    } else {
+                        let baseCorr = (ADR_META[a].sector === ADR_META[b].sector) ? (0.7 + Math.random() * 0.25) : (0.3 + Math.random() * 0.4);
+                        if (baseCorr > 0.99) baseCorr = 0.99;
+                        matrixData[a][b] = { corr: baseCorr, z: (Math.random() * 6) - 3 };
+                    }
+                });
+            });
+
+            let zVal = 0;
+            fullZScore = dates.map(dt => {
+                zVal += (Math.random() - 0.5) * 0.4;
+                if (zVal > 3.2) zVal -= 0.5;
+                if (zVal < -3.2) zVal += 0.5;
+                return {x: dt, y: zVal};
+            });
+
+            let ratioVal = 1.2;
+            fullRatio = dates.map(dt => {
+                ratioVal += (Math.random() - 0.5) * 0.03;
+                return {x: dt, y: ratioVal};
+            });
+            fullRatioSMA = calculateMA(fullRatio, 60);
+        }
+
+        // Cargar serie real de un ADR puntual desde datos_adrs.json
+        function loadRealAssetSeries(ticker) {
+            const tData = realTickersStore[ticker];
+            if (!tData) return;
+
+            fullDataInd = dates.map((dt, i) => {
+                const bar = tData.ohlc[i];
+                if (!bar || bar[3] == null) {
+                    return { x: dt, o: null, h: null, l: null, c: null, y: null };
+                }
+                return { x: dt, o: bar[0], h: bar[1], l: bar[2], c: bar[3], y: bar[3] };
+            });
+
+            dummyRSI = dates.map((dt, i) => ({ x: dt, y: tData.rsi[i] }));
+            dummyMACD = dates.map((dt, i) => ({ x: dt, y: tData.macd[i] }));
+            dummyVol = dates.map((dt, i) => ({ x: dt, y: tData.vol[i] }));
+            dummyATR = dates.map((dt, i) => ({ x: dt, y: tData.atr[i] }));
+            dummyVolSMA = calculateMA(dummyVol, 20);
+
+            precomputedInd = {
+                ema21: dates.map((dt, i) => ({ x: dt, y: tData.ema21[i] })),
+                sma50: dates.map((dt, i) => ({ x: dt, y: tData.sma50[i] })),
+                sma200: dates.map((dt, i) => ({ x: dt, y: tData.sma200[i] })),
+                bbUp: dates.map((dt, i) => ({ x: dt, y: tData.bb_up[i] })),
+                bbLow: dates.map((dt, i) => ({ x: dt, y: tData.bb_low[i] }))
+            };
+
+            const dateToBar = new Map(fullDataInd.map(b => [b.x, b]));
+            signalsBuy = (tData.buy_signals || []).map(ts => {
+                const bar = dateToBar.get(ts);
+                return bar ? { x: ts, y: bar.l * 0.985 } : null;
+            }).filter(Boolean);
+
+            signalsSell = (tData.sell_signals || []).map(ts => {
+                const bar = dateToBar.get(ts);
+                return bar ? { x: ts, y: bar.h * 1.015 } : null;
+            }).filter(Boolean);
+        }
+
+        // Calcular serie real de Z-Score (60 ruedas), Ratio Nominal y SMA 60 para cualquier par (A, B)
+        function computeRealSpreadSeries(assetA, assetB) {
+            const pairKey = `${assetA}_${assetB}`;
+            if (lastSpreadPairKey === pairKey && fullZScore.length === dates.length) return;
+
+            const dataA = realTickersStore[assetA];
+            const dataB = realTickersStore[assetB];
+            if (!dataA || !dataB) return;
+
+            lastSpreadPairKey = pairKey;
+            const n = dates.length;
+            const logRatios = new Array(n);
+            fullRatio = new Array(n);
+
+            for (let i = 0; i < n; i++) {
+                const barA = dataA.ohlc[i];
+                const barB = dataB.ohlc[i];
+                const cA = barA ? barA[3] : null;
+                const cB = barB ? barB[3] : null;
+                if (cA != null && cB != null && cA > 0 && cB > 0) {
+                    const ratio = cA / cB;
+                    fullRatio[i] = { x: dates[i], y: ratio };
+                    logRatios[i] = Math.log(ratio);
+                } else {
+                    fullRatio[i] = { x: dates[i], y: null };
+                    logRatios[i] = null;
+                }
+            }
+
+            fullZScore = new Array(n);
+            const windowSize = 60;
+            for (let i = 0; i < n; i++) {
+                if (i < windowSize - 1 || logRatios[i] == null) {
+                    fullZScore[i] = { x: dates[i], y: null };
+                    continue;
+                }
+                let sum = 0;
+                let hasNull = false;
+                for (let j = 0; j < windowSize; j++) {
+                    if (logRatios[i - j] == null) { hasNull = true; break; }
+                    sum += logRatios[i - j];
+                }
+                if (hasNull) {
+                    fullZScore[i] = { x: dates[i], y: null };
+                    continue;
+                }
+                const mean = sum / windowSize;
+
+                let sumSq = 0;
+                for (let j = 0; j < windowSize; j++) {
+                    const diff = logRatios[i - j] - mean;
+                    sumSq += diff * diff;
+                }
+                const std = Math.sqrt(sumSq / (windowSize - 1));
+                const z = std > 1e-9 ? (logRatios[i] - mean) / std : 0;
+                fullZScore[i] = { x: dates[i], y: z };
+            }
+
+            fullRatioSMA = calculateMA(fullRatio, 60);
+        }
+
+        // Renderizar tarjetas dinámicas de Alertas de Trading desde datos_adrs.json
+        function renderAlertsFromJSON(alertsList) {
+            const grid = document.getElementById('alerts-grid');
+            const emptyMsg = document.getElementById('alerts-empty-msg');
+            if (!grid) return;
+
+            if (!alertsList || alertsList.length === 0) {
+                grid.innerHTML = '';
+                emptyMsg.innerText = 'No se detectaron alertas activas según las reglas configuradas en el último cierre.';
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+
+            const badgeStyles = {
+                'compra_tend': 'bg-green-500/10 text-green-400 border border-green-500/30',
+                'compra_rev':  'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+                'venta':       'bg-red-500/10 text-red-400 border border-red-500/30',
+                'watchlist':   'bg-orange-500/10 text-orange-400 border border-orange-500/30',
+                'rotacion':    'bg-blue-500/10 text-blue-400 border border-blue-500/30',
+                'stoploss':    'bg-red-600/20 text-red-500 border border-red-500/40'
+            };
+
+            grid.innerHTML = alertsList.map(al => {
+                const navCall = al.type === 'ind'
+                    ? `navigateFromAlert('ind', '${al.tickerA}')`
+                    : `navigateFromAlert('rv', '${al.tickerA}', '${al.tickerB}')`;
+                const badgeCls = badgeStyles[al.badgeStyle] || badgeStyles['rotacion'];
+
+                return `
+                    <div onclick="${navCall}" data-category="${al.category}" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-3 gap-2">
+                                <div>
+                                    <span class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">${al.title}</span>
+                                    <span class="text-xs text-slate-400 block">${al.subtitle}</span>
+                                </div>
+                                <span class="${badgeCls} text-xs px-2 py-1 rounded font-semibold tracking-wide shrink-0">${al.badge}</span>
+                            </div>
+                            <p class="text-sm text-slate-300">${al.description}</p>
+                        </div>
+                        <div class="mt-4 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-blue-400 transition-colors">
+                            <span>${al.footerLabel}</span>
+                            <span>${al.footerAction}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Reaplicar filtro de píldora activo
+            const activeBtn = document.querySelector('.alert-filter-btn[data-active="true"]');
+            if (activeBtn) activeBtn.click();
+        }
+
+        // Función para renderizar las matrices
+        function renderMatrices() {
+            const tbodyCorr = document.getElementById('matrix-corr');
+            const tbodyZ = document.getElementById('matrix-zscore');
+            const hideLowCorr = document.getElementById('toggle-corr-filter').checked;
+            const tooltip = document.getElementById('matrix-tooltip');
+
+            let theadHTML = `<thead><tr><th class="sticky left-0 z-20 bg-[#0B1120] border-b border-slate-600 p-2">ADR</th>`;
+            validADRs.forEach(a => theadHTML += `<th class="border-b border-slate-600 p-2 font-medium text-slate-400 bg-[#0B1120]">${a}</th>`);
+            theadHTML += `</tr></thead>`;
+
+            let bodyCorr = `<tbody>`;
+            let bodyZ = `<tbody>`;
+
+            validADRs.forEach(rowAsset => {
+                let rowCorr = `<tr><td class="sticky left-0 z-10 bg-ppi-card font-bold text-white border-r border-slate-700 p-2">${rowAsset}</td>`;
+                let rowZ = `<tr><td class="sticky left-0 z-10 bg-ppi-card font-bold text-white border-r border-slate-700 p-2">${rowAsset}</td>`;
+
+                validADRs.forEach(colAsset => {
+                    const data = matrixData[rowAsset][colAsset];
+                    
+                    // Colores Correlación
+                    let bgCorr = 'bg-[#0B1120] text-slate-500';
+                    if (data.corr >= 0.75 && rowAsset !== colAsset) bgCorr = 'bg-emerald-900/40 text-emerald-400';
+                    if (data.corr < 0.75 && rowAsset !== colAsset) bgCorr = 'bg-slate-800 text-slate-300';
+                    if (rowAsset === colAsset) bgCorr = 'bg-[#1F2937] text-slate-500';
+
+                    // Colores Z-Score
+                    let bgZ = 'bg-[#0B1120] text-slate-400';
+                    if (rowAsset !== colAsset) {
+                        if (data.z > 2) bgZ = 'bg-red-900/60 text-red-300 font-bold';
+                        else if (data.z > 1) bgZ = 'bg-red-900/20 text-red-400';
+                        else if (data.z < -2) bgZ = 'bg-emerald-900/60 text-emerald-300 font-bold';
+                        else if (data.z < -1) bgZ = 'bg-emerald-900/20 text-emerald-400';
+                    } else {
+                        bgZ = 'bg-[#1F2937] text-slate-500';
+                    }
+
+                    // Opacidad (Filtro)
+                    let opacityClass = (hideLowCorr && data.corr < 0.75 && rowAsset !== colAsset) ? 'opacity-20 grayscale' : 'opacity-100 hover:brightness-125';
+
+                    // Celdas
+                    rowCorr += `<td class="border border-slate-700/50 p-2 cursor-pointer transition-all ${bgCorr} ${opacityClass}" onclick="selectPairFromMatrix('${rowAsset}', '${colAsset}')">${data.corr.toFixed(2)}</td>`;
+                    
+                    // Logic texto tooltip
+                    let tooltipAction = "Sin señal";
+                    let actionColor = "text-slate-300";
+                    if(data.z > 2) { tooltipAction = `Vender ${rowAsset} / Comprar ${colAsset}`; actionColor = "text-red-400"; }
+                    if(data.z < -2) { tooltipAction = `Comprar ${rowAsset} / Vender ${colAsset}`; actionColor = "text-emerald-400"; }
+
+                    rowZ += `<td class="border border-slate-700/50 p-2 cursor-pointer transition-all ${bgZ} ${opacityClass}" 
+                                 onclick="selectPairFromMatrix('${rowAsset}', '${colAsset}')"
+                                 onmouseenter="showMatrixTooltip(event, '${rowAsset}', '${colAsset}', ${data.z.toFixed(2)}, ${data.corr.toFixed(2)}, '${tooltipAction}', '${actionColor}')"
+                                 onmouseleave="hideMatrixTooltip()">
+                                 ${data.z.toFixed(2)}
+                              </td>`;
+                });
+                bodyCorr += rowCorr + `</tr>`;
+                bodyZ += rowZ + `</tr>`;
+            });
+
+            tbodyCorr.innerHTML = theadHTML + bodyCorr + `</tbody>`;
+            tbodyZ.innerHTML = theadHTML + bodyZ + `</tbody>`;
+        }
+
+        function showMatrixTooltip(e, row, col, z, corr, action, colorClass) {
+            if (row === col) return;
+            const tt = document.getElementById('matrix-tooltip');
+            tt.innerHTML = `
+                <div class="font-bold border-b border-slate-600 pb-1 mb-1">${row} vs ${col}</div>
+                <div>Z-Score: <span class="${z > 0 ? 'text-red-400' : 'text-emerald-400'}">${z}</span> | Corr: ${corr}</div>
+                <div class="mt-1 font-bold ${colorClass}">${action}</div>
+            `;
+            tt.classList.remove('hidden');
+            
+            // Adjust position
+            let left = e.pageX + 15;
+            let top = e.pageY + 15;
+            if (left + 200 > window.innerWidth) left = e.pageX - 215;
+            tt.style.left = left + 'px';
+            tt.style.top = top + 'px';
+        }
+
+        function hideMatrixTooltip() { document.getElementById('matrix-tooltip').classList.add('hidden'); }
+
+        function selectPairFromMatrix(assetA, assetB) {
+            if (assetA === assetB) return; // Ignore diag
+            document.getElementById('spread-asset-a').value = assetA;
+            document.getElementById('spread-asset-b').value = assetB;
+            
+            // Scroll to chart
+            document.getElementById('section-rv').scrollIntoView({behavior: 'smooth', block: 'start'});
+            
+            // Highlight validation
+            document.getElementById('spread-asset-a').classList.add('ring-2', 'ring-blue-500');
+            document.getElementById('spread-asset-b').classList.add('ring-2', 'ring-blue-500');
+            setTimeout(() => {
+                document.getElementById('spread-asset-a').classList.remove('ring-2', 'ring-blue-500');
+                document.getElementById('spread-asset-b').classList.remove('ring-2', 'ring-blue-500');
+            }, 800);
+
+            renderSpreadChart();
+        }
+
+        // --- FILTRADO Y NAVEGACIÓN DE ALERTAS DE TRADING ---
+        document.querySelectorAll('.alert-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filter = btn.dataset.filter;
+
+                document.querySelectorAll('.alert-filter-btn').forEach(b => {
+                    const isActive = b === btn;
+                    b.dataset.active = isActive ? 'true' : 'false';
+                    if (isActive) {
+                        b.className = 'alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-blue text-white border-blue-500/40';
+                    } else {
+                        b.className = 'alert-filter-btn px-3 py-1 rounded-full text-xs font-medium border transition-all bg-ppi-card text-slate-400 border-slate-700 hover:text-white';
+                    }
+                });
+
+                let visibleCount = 0;
+                document.querySelectorAll('.alert-card').forEach(card => {
+                    const show = filter === 'all' || card.dataset.category === filter;
+                    card.classList.toggle('hidden', !show);
+                    if (show) visibleCount++;
+                });
+
+                document.getElementById('alerts-empty-msg').classList.toggle('hidden', visibleCount > 0);
+            });
+        });
+
+        function navigateFromAlert(type, tickerA, tickerB) {
+            if (type === 'ind') {
+                const inputInd = document.getElementById('ind-asset');
+                inputInd.value = tickerA;
+                document.getElementById('section-individual').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                inputInd.classList.add('ring-2', 'ring-blue-500');
+                setTimeout(() => inputInd.classList.remove('ring-2', 'ring-blue-500'), 900);
+
+                renderIndividualChart();
+            } else if (type === 'rv') {
+                selectPairFromMatrix(tickerA, tickerB);
+            }
+        }
+
+        // Helper para filtrar índices basado en fechas o botones
+        function getFilteredIndices(chartId) {
+            let activePeriod = document.querySelector(`.time-btn-${chartId}[data-active="true"]`);
+            let fromInput = document.getElementById(`${chartId}-date-from`).value;
+            let toInput = document.getElementById(`${chartId}-date-to`).value;
+
+            let startIndex = 0;
+            let endIndex = dates.length - 1;
+
+            if (activePeriod) {
+                let period = activePeriod.dataset.period;
+                if (period === 'YTD' && dates.length > 0) {
+                    const lastYear = new Date(dates[dates.length - 1]).getFullYear();
+                    const jan1 = new Date(lastYear, 0, 1).getTime();
+                    const idx = dates.findIndex(d => d >= jan1);
+                    startIndex = idx === -1 ? 0 : idx;
+                } else {
+                    const daysMap = { '1W': 5, '1M': 22, '1Y': 252, '5Y': 1260, 'MAX': dates.length };
+                    let daysToKeep = daysMap[period] || dates.length;
+                    startIndex = Math.max(0, dates.length - daysToKeep);
+                }
+            } else if (fromInput || toInput) {
+                let fDate = fromInput ? new Date(fromInput) : dates[0];
+                let tDate = toInput ? new Date(toInput) : dates[dates.length - 1];
+                
+                // Ajustar horas para no tener errores de zona horaria con el selector YYYY-MM-DD
+                fDate.setHours(0,0,0,0);
+                tDate.setHours(23,59,59,999);
+
+                startIndex = dates.findIndex(d => d >= fDate);
+                if (startIndex === -1) startIndex = 0;
+                
+                let endIdx = dates.findIndex(d => d > tDate);
+                endIndex = endIdx === -1 ? dates.length - 1 : Math.max(0, endIdx - 1);
+                
+                if (endIndex < startIndex) endIndex = startIndex;
+            }
+            return { start: startIndex, end: endIndex };
+        }
+
+        // --- RENDER GRÁFICO INDIVIDUAL ---
+        let currentIndEnd = dates.length - 1;
+
+        function updateIndividualStatusBar(realIndex, isLatest = false) {
+            if (realIndex < 0 || realIndex >= dates.length) return;
+            const dateEl = document.getElementById('dp-date');
+            const badgeEl = document.getElementById('dp-ind-latest-badge');
+            const priceEl = document.getElementById('dp-price');
+            if (!dateEl || !priceEl) return;
+
+            dateEl.innerText = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(new Date(dates[realIndex]));
+            if (badgeEl) badgeEl.classList.toggle('hidden', !isLatest);
+            const bar = fullDataInd[realIndex];
+            priceEl.innerText = (bar && bar.c != null) ? ('$' + bar.c.toFixed(2)) : 'Sin cotización';
+            const shRSI = document.getElementById('toggle-rsi').checked;
+            const shMACD = document.getElementById('toggle-macd').checked;
+            const shVol = document.getElementById('toggle-vol').checked;
+            const shATR = document.getElementById('toggle-atr').checked;
+
+            document.getElementById('dp-sep-rsi').classList.toggle('hidden', !shRSI);
+            document.getElementById('dp-wrap-rsi').classList.toggle('hidden', !shRSI);
+            if (shRSI) document.getElementById('dp-rsi').innerText = dummyRSI[realIndex].y != null ? dummyRSI[realIndex].y.toFixed(2) : '-';
+
+            document.getElementById('dp-sep-macd').classList.toggle('hidden', !shMACD);
+            document.getElementById('dp-wrap-macd').classList.toggle('hidden', !shMACD);
+            if (shMACD) document.getElementById('dp-macd').innerText = dummyMACD[realIndex].y != null ? dummyMACD[realIndex].y.toFixed(3) : '-';
+
+            document.getElementById('dp-sep-vol').classList.toggle('hidden', !shVol);
+            document.getElementById('dp-wrap-vol').classList.toggle('hidden', !shVol);
+            if (shVol) {
+                const v = dummyVol[realIndex].y || 0;
+                document.getElementById('dp-vol').innerText = v >= 1000000 ? (v / 1000000).toFixed(2) + 'M' : (v / 1000).toFixed(1) + 'K';
+            }
+
+            document.getElementById('dp-sep-atr').classList.toggle('hidden', !shATR);
+            document.getElementById('dp-wrap-atr').classList.toggle('hidden', !shATR);
+            if (shATR) document.getElementById('dp-atr').innerText = dummyATR[realIndex].y != null ? '$' + dummyATR[realIndex].y.toFixed(2) : '-';
+        }
+
+        function renderIndividualChart() {
+            const ctx = document.getElementById('chartIndividual').getContext('2d');
+            const assetName = document.getElementById('ind-asset').value.trim().toUpperCase() || 'GGAL';
+            if (isRealDataLoaded && realTickersStore[assetName]) {
+                loadRealAssetSeries(assetName);
+            }
+            
+            // Toggles y Selectores
+            const sEma21 = document.getElementById('toggle-ema21').checked;
+            const sSma50 = document.getElementById('toggle-sma50').checked;
+            const sSma200 = document.getElementById('toggle-sma200').checked;
+            const sBB = document.getElementById('toggle-bb').checked;
+            
+            const chartType = document.getElementById('ind-chart-type').value;
+            const subPanelType = document.getElementById('ind-sub-panel').value;
+
+            // Actualizar leyenda superior de medias móviles y etiqueta del sub-panel
+            const legendContainer = document.getElementById('ind-custom-legend');
+            if (legendContainer) {
+                let legendItems = `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#3B82F6]"></div><span class="text-slate-200 font-semibold">Precio ${assetName}</span></div>`;
+                if (sEma21) legendItems += `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#F472B6]"></div><span class="text-slate-300">EMA 21</span></div>`;
+                if (sSma50) legendItems += `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#F59E0B]"></div><span class="text-slate-300">SMA 50</span></div>`;
+                if (sSma200) legendItems += `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-[#EF4444]"></div><span class="text-slate-300">SMA 200</span></div>`;
+                if (sBB) legendItems += `<div class="flex items-center gap-1.5"><div class="w-3 h-0 border-t border-dashed border-[#8B5CF6]"></div><span class="text-slate-300">Bandas Bollinger (20, 2)</span></div>`;
+                legendContainer.innerHTML = legendItems;
+            }
+
+            const subBadge = document.getElementById('ind-subpanel-badge');
+            if (subBadge) {
+                subBadge.innerHTML = subPanelType === 'vol'
+                    ? `<span class="w-2.5 h-2.5 rounded-sm bg-blue-400/50 inline-block"></span><span>Volumen</span><span class="text-slate-600">|</span><span class="w-2.5 h-2.5 rounded-sm bg-orange-500/80 inline-block"></span><span class="text-orange-300">RVOL &gt; 1.2x</span>`
+                    : `<span class="w-3 h-0.5 bg-[#818CF8] inline-block"></span><span class="text-indigo-300">RSI (14)</span><span class="text-slate-500 text-[10px]">(Niveles 30 / 40 / 75)</span>`;
+            }
+
+            const {start, end} = getFilteredIndices('ind');
+            currentIndEnd = end;
+            updateIndividualStatusBar(end, true);
+
+            const filteredData = fullDataInd.slice(start, end + 1);
+            
+            const datasets = [];
+
+            // Dataset Principal (Velas o Línea)
+            if (chartType === 'candlestick') {
+                datasets.push({
+                    label: `Precio ${assetName}`,
+                    data: filteredData.filter(d => d.c != null),
+                    type: 'candlestick',
+                    yAxisID: 'y'
+                });
+            } else {
+                datasets.push({
+                    label: `Precio ${assetName}`,
+                    data: filteredData.map(d => ({x: d.x, y: d.c})),
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0, pointHoverRadius: 4,
+                    fill: true, tension: 0.1,
+                    type: 'line',
+                    yAxisID: 'y'
+                });
+            }
+
+            if (sEma21) datasets.push({ type: 'line', label: 'EMA 21', data: (precomputedInd ? precomputedInd.ema21 : calculateMA(fullDataInd, 21, true)).slice(start, end + 1), borderColor: '#F472B6', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            if (sSma50) datasets.push({ type: 'line', label: 'SMA 50', data: (precomputedInd ? precomputedInd.sma50 : calculateMA(fullDataInd, 50)).slice(start, end + 1), borderColor: '#F59E0B', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            if (sSma200) datasets.push({ type: 'line', label: 'SMA 200', data: (precomputedInd ? precomputedInd.sma200 : calculateMA(fullDataInd, 200)).slice(start, end + 1), borderColor: '#EF4444', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
+            
+            if (sBB) {
+                const bb = precomputedInd ? { upper: precomputedInd.bbUp, lower: precomputedInd.bbLow } : calculateBollinger(fullDataInd, 20, 2);
+                datasets.push({ type: 'line', label: 'BB Up', data: bb.upper.slice(start, end + 1), borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
+                datasets.push({ type: 'line', label: 'BB Low', data: bb.lower.slice(start, end + 1), borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
+            }
+
+            // Señales de Trading
+            datasets.push({
+                type: 'scatter', label: 'Señal Compra',
+                data: signalsBuy.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x),
+                backgroundColor: '#10B981', pointStyle: 'triangle', rotation: 0, radius: 7, hoverRadius: 9, yAxisID: 'y'
+            });
+            datasets.push({
+                type: 'scatter', label: 'Señal Venta',
+                data: signalsSell.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x),
+                backgroundColor: '#EF4444', pointStyle: 'triangle', rotation: 180, radius: 7, hoverRadius: 9, yAxisID: 'y'
+            });
+
+            // Sub-Panel Inferior
+            let customAnnotations = {};
+            if (subPanelType === 'vol') {
+                const volData = dummyVol.slice(start, end + 1);
+                const rvolColors = volData.map((d, i) => {
+                    let realIdx = start + i;
+                    let smaV = dummyVolSMA[realIdx]?.y || 1;
+                    let rvol = d.y / smaV;
+                    return rvol > 1.2 ? 'rgba(249, 115, 22, 0.8)' : 'rgba(96, 165, 250, 0.35)';
+                });
+                datasets.push({
+                    type: 'bar', label: 'Volumen', data: volData,
+                    backgroundColor: rvolColors, yAxisID: 'ySub', borderRadius: 2
+                });
+            } else {
+                datasets.push({
+                    type: 'line', label: 'RSI (14)', data: dummyRSI.slice(start, end + 1),
+                    borderColor: '#818CF8', borderWidth: 1.5, pointRadius: 0, tension: 0.1, yAxisID: 'ySub'
+                });
+                customAnnotations.rsi75 = { type: 'line', yMin: 75, yMax: 75, yScaleID: 'ySub', borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1 };
+                customAnnotations.rsi40 = { type: 'line', yMin: 40, yMax: 40, yScaleID: 'ySub', borderColor: 'rgba(255, 255, 255, 0.2)', borderDash: [2, 4], borderWidth: 1 };
+                customAnnotations.rsi30 = { type: 'line', yMin: 30, yMax: 30, yScaleID: 'ySub', borderColor: 'rgba(16, 185, 129, 0.4)', borderDash: [4, 4], borderWidth: 1 };
+            }
+
+            // Etiqueta Ultimo Precio
+            const validBars = filteredData.filter(d => d.c != null);
+            const lastValidBar = validBars.length > 0 ? validBars[validBars.length - 1] : null;
+            const lastPrice = lastValidBar ? lastValidBar.c : 0;
+            customAnnotations.lastPriceBadge = {
+                type: 'label', yScaleID: 'y', xScaleID: 'x',
+                xValue: lastValidBar ? lastValidBar.x : 0,
+                yValue: lastPrice,
+                content: '$' + lastPrice.toFixed(2),
+                backgroundColor: '#3B82F6', color: '#0B1120',
+                font: { size: 11, family: 'Inter', weight: 'bold' },
+                padding: {x: 4, y: 2}, borderRadius: 4,
+                position: 'start', xAdjust: 6
+            };
+
+            if (chartInd) chartInd.destroy();
+            
+            chartInd = new Chart(ctx, {
+                data: { datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { left: 15, right: 55, top: 8 } },
+                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(17,24,39,0.92)',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            filter: (tooltipItem) => {
+                                const label = tooltipItem.dataset.label || '';
+                                return label.startsWith('Precio') || label === 'EMA 21' || label === 'SMA 50' || label === 'SMA 200' || label.startsWith('BB ');
+                            }
+                        },
+                        legend: { display: false },
+                        annotation: { annotations: customAnnotations }
+                    },
+                    scales: {
+                        x: { 
+                            type: 'time', 
+                            time: { tooltipFormat: 'dd MMM yyyy' }, 
+                            adapters: { date: { locale: 'es' } },
+                            grid: { color: '#1F2937' },
+                            ticks: { 
+                                color: '#9CA3AF',
+                                maxTicksLimit: window.innerWidth < 768 ? 5 : 12
+                            }
+                        },
+                        ySub: { 
+                            type: 'linear', position: 'left', 
+                            stack: 'indGroup', stackWeight: 30, 
+                            grid: { color: '#1F2937' },
+                            ticks: { 
+                                color: '#9CA3AF',
+                                callback: function(value) {
+                                    if (subPanelType === 'vol') {
+                                        if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                        if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                                    }
+                                    return value;
+                                }
+                            }
+                        },
+                        y: { 
+                            type: 'linear', position: 'left', 
+                            stack: 'indGroup', stackWeight: 70, 
+                            offset: true,
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9CA3AF', callback: function(value) { return '$' + value; } }
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        if (elements && elements.length > 0) {
+                            const dataIndex = elements[0].index;
+                            const realIndex = start + dataIndex;
+                            updateIndividualStatusBar(realIndex, false);
+                        } else {
+                            updateIndividualStatusBar(end, true);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Restaurar valores del último cierre al salir del área del gráfico individual
+        const indCanvasEl = document.getElementById('chartIndividual');
+        indCanvasEl.addEventListener('mouseleave', () => updateIndividualStatusBar(currentIndEnd, true));
+        indCanvasEl.addEventListener('touchend', () => updateIndividualStatusBar(currentIndEnd, true));
+
+        // --- RENDER GRÁFICO RELATIVE VALUE (SPREADS) ---
+        let currentSpreadEnd = dates.length - 1;
+
+        function updateSpreadStatusBar(realIndex, isLatest = false) {
+            if (realIndex < 0 || realIndex >= dates.length) return;
+            const dateEl = document.getElementById('sp-date');
+            const badgeEl = document.getElementById('sp-latest-badge');
+            const zEl = document.getElementById('sp-zscore');
+            const ratioEl = document.getElementById('sp-ratio');
+            const smaEl = document.getElementById('sp-sma');
+            const diffEl = document.getElementById('sp-diff');
+            if (!dateEl || !zEl) return;
+
+            dateEl.innerText = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(new Date(dates[realIndex]));
+            if (badgeEl) badgeEl.classList.toggle('hidden', !isLatest);
+
+            const z = fullZScore[realIndex].y;
+            const ratio = fullRatio[realIndex].y;
+            const sma = fullRatioSMA[realIndex]?.y;
+            const diffPct = (sma && ratio != null) ? ((ratio - sma) / sma) * 100 : 0;
+
+            if (z != null) {
+                zEl.innerText = (z >= 0 ? '+' : '') + z.toFixed(2);
+                zEl.className = 'font-mono font-semibold ' + (z > 2 ? 'text-red-400' : z < -2 ? 'text-emerald-400' : 'text-sky-400');
+            } else {
+                zEl.innerText = '-';
+                zEl.className = 'font-mono font-semibold text-slate-400';
+            }
+
+            ratioEl.innerText = ratio != null ? ratio.toFixed(3) : '-';
+            smaEl.innerText = sma != null ? sma.toFixed(3) : '-';
+            diffEl.innerText = sma != null ? ((diffPct >= 0 ? '+' : '') + diffPct.toFixed(2) + '%') : '-';
+            diffEl.className = 'font-mono font-semibold ' + (diffPct >= 0 ? 'text-emerald-400' : 'text-red-400');
+        }
+
+        function renderSpreadChart() {
+            const ctx = document.getElementById('chartSpread').getContext('2d');
+            const assetA = document.getElementById('spread-asset-a').value.trim().toUpperCase() || 'BMA';
+            const assetB = document.getElementById('spread-asset-b').value.trim().toUpperCase() || 'BBAR';
+
+            if (isRealDataLoaded && realTickersStore[assetA] && realTickersStore[assetB]) {
+                computeRealSpreadSeries(assetA, assetB);
+            }
+
+            const corr = (matrixData[assetA] && matrixData[assetA][assetB]) ? matrixData[assetA][assetB].corr : 0.80;
+            const corrBadgeEl = document.getElementById('correlation-badge');
+            if (corrBadgeEl) {
+                if (corr < 0.75) {
+                    corrBadgeEl.innerHTML = `
+                        <div class="bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs px-3 py-2 rounded-lg leading-snug">
+                            ⚠️ <strong>Baja Correlación (${corr.toFixed(2)}).</strong> Estos activos no tienen un comportamiento histórico similar; las señales de Z-Score pueden ser ineficientes o falsas.
+                        </div>
+                    `;
+                } else {
+                    corrBadgeEl.innerHTML = `
+                        <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-1.5 rounded-lg font-medium">
+                            ✓ Correlación Fuerte (${corr.toFixed(2)})
+                        </div>
+                    `;
+                }
+            }
+
+            const { start, end } = getFilteredIndices('spread');
+            currentSpreadEnd = end;
+            updateSpreadStatusBar(end, true);
+
+            const filteredZ = fullZScore.slice(start, end + 1);
+            const filteredRatio = fullRatio.slice(start, end + 1);
+            const filteredRatioSMA = fullRatioSMA.slice(start, end + 1);
+
+            const validZ = filteredZ.filter(p => p.y != null);
+            const validR = filteredRatio.filter(p => p.y != null);
+            const lastZPt = validZ.length > 0 ? validZ[validZ.length - 1] : { x: 0, y: 0 };
+            const lastRPt = validR.length > 0 ? validR[validR.length - 1] : { x: 0, y: 0 };
+            const lastZ = lastZPt.y;
+            const lastRatio = lastRPt.y;
+
+            const spreadAnnotations = {
+                boxAbove2: {
+                    type: 'box',
+                    yScaleID: 'yZ',
+                    yMin: 2,
+                    yMax: 4.5,
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderWidth: 0
+                },
+                boxBelowMinus2: {
+                    type: 'box',
+                    yScaleID: 'yZ',
+                    yMin: -4.5,
+                    yMax: -2,
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    borderWidth: 0
+                },
+                linePlus2: {
+                    type: 'line',
+                    yScaleID: 'yZ',
+                    yMin: 2,
+                    yMax: 2,
+                    borderColor: '#EF4444',
+                    borderDash: [5, 5],
+                    borderWidth: 1.2,
+                    label: {
+                        display: true,
+                        content: `+2 SD: ${assetA} caro vs ${assetB}`,
+                        position: 'start',
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        color: '#FCA5A5',
+                        font: { size: 10, family: 'Inter', weight: '500' },
+                        padding: { x: 6, y: 2 },
+                        yAdjust: -10
+                    }
+                },
+                lineMinus2: {
+                    type: 'line',
+                    yScaleID: 'yZ',
+                    yMin: -2,
+                    yMax: -2,
+                    borderColor: '#10B981',
+                    borderDash: [5, 5],
+                    borderWidth: 1.2,
+                    label: {
+                        display: true,
+                        content: `-2 SD: ${assetA} barato vs ${assetB}`,
+                        position: 'start',
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        color: '#6EE7B7',
+                        font: { size: 10, family: 'Inter', weight: '500' },
+                        padding: { x: 6, y: 2 },
+                        yAdjust: 10
+                    }
+                },
+                lineZero: {
+                    type: 'line',
+                    yScaleID: 'yZ',
+                    yMin: 0,
+                    yMax: 0,
+                    borderColor: '#6B7280',
+                    borderDash: [3, 3],
+                    borderWidth: 1
+                },
+                lastZBadge: {
+                    type: 'label',
+                    yScaleID: 'yZ',
+                    xScaleID: 'x',
+                    xValue: lastZPt.x,
+                    yValue: lastZ,
+                    content: (lastZ >= 0 ? '+' : '') + lastZ.toFixed(2),
+                    backgroundColor: '#38BDF8',
+                    color: '#0B1120',
+                    font: { size: 10, family: 'Inter', weight: 'bold' },
+                    padding: { x: 4, y: 2 },
+                    borderRadius: 4,
+                    position: 'start',
+                    xAdjust: 6
+                },
+                lastRatioBadge: {
+                    type: 'label',
+                    yScaleID: 'yRatio',
+                    xScaleID: 'x',
+                    xValue: lastRPt.x,
+                    yValue: lastRatio,
+                    content: lastRatio.toFixed(3),
+                    backgroundColor: '#A78BFA',
+                    color: '#0B1120',
+                    font: { size: 10, family: 'Inter', weight: 'bold' },
+                    padding: { x: 4, y: 2 },
+                    borderRadius: 4,
+                    position: 'start',
+                    xAdjust: 6
+                }
+            };
+
+            if (chartRel) chartRel.destroy();
+
+            chartRel = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Z-Score Log',
+                            data: filteredZ,
+                            borderColor: '#38BDF8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            tension: 0.1,
+                            yAxisID: 'yZ'
+                        },
+                        {
+                            label: 'Ratio Nominal',
+                            data: filteredRatio,
+                            borderColor: '#A78BFA',
+                            borderWidth: 1.8,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            tension: 0.1,
+                            yAxisID: 'yRatio'
+                        },
+                        {
+                            label: 'SMA 60 Ratio',
+                            data: filteredRatioSMA,
+                            borderColor: '#FCD34D',
+                            borderWidth: 1.5,
+                            borderDash: [4, 4],
+                            pointRadius: 0,
+                            tension: 0.1,
+                            yAxisID: 'yRatio'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { left: 12, right: 55, top: 8 } },
+                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        tooltip: { enabled: false },
+                        legend: { display: false },
+                        annotation: { annotations: spreadAnnotations }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { tooltipFormat: 'dd MMM yyyy' },
+                            adapters: { date: { locale: 'es' } },
+                            grid: { color: '#1F2937' },
+                            ticks: {
+                                color: '#9CA3AF',
+                                maxTicksLimit: window.innerWidth < 768 ? 5 : 12
+                            }
+                        },
+                        yZ: {
+                            type: 'linear',
+                            position: 'left',
+                            stack: 'spreadGroup',
+                            stackWeight: 65,
+                            min: -3.5,
+                            max: 3.5,
+                            grid: { color: '#1F2937' },
+                            ticks: {
+                                color: '#9CA3AF',
+                                callback: function (val) {
+                                    return (val > 0 ? '+' : '') + val.toFixed(1);
+                                }
+                            }
+                        },
+                        yRatio: {
+                            type: 'linear',
+                            position: 'left',
+                            stack: 'spreadGroup',
+                            stackWeight: 35,
+                            offset: true,
+                            grid: { color: '#1F2937' },
+                            ticks: {
+                                color: '#9CA3AF',
+                                callback: function (val) {
+                                    return val.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        if (elements && elements.length > 0) {
+                            const dataIndex = elements[0].index;
+                            const realIndex = start + dataIndex;
+                            updateSpreadStatusBar(realIndex, false);
+                        } else {
+                            updateSpreadStatusBar(end, true);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Restaurar valores del último cierre al salir del área del gráfico de spreads
+        const spreadCanvasEl = document.getElementById('chartSpread');
+        spreadCanvasEl.addEventListener('mouseleave', () => updateSpreadStatusBar(currentSpreadEnd, true));
+        spreadCanvasEl.addEventListener('touchend', () => updateSpreadStatusBar(currentSpreadEnd, true));
+
+        // --- VALIDACIÓN DE INPUTS ADR ---
+        function attachADRValidation(inputId, onValidCallback) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const errorTag = document.createElement('span');
+            errorTag.className = 'hidden text-[11px] text-red-400 mt-1 block font-medium';
+            errorTag.innerText = 'Campo inválido';
+            input.parentNode.appendChild(errorTag);
+
+            input.addEventListener('input', () => {
+                const val = input.value.trim().toUpperCase();
+                if (validADRs.includes(val)) {
+                    input.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+                    input.classList.add('border-slate-700');
+                    errorTag.classList.add('hidden');
+                    onValidCallback();
+                } else {
+                    input.classList.remove('border-slate-700');
+                    input.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                    errorTag.classList.remove('hidden');
+                }
+            });
+        }
+
+        attachADRValidation('ind-asset', renderIndividualChart);
+        attachADRValidation('spread-asset-a', renderSpreadChart);
+        attachADRValidation('spread-asset-b', renderSpreadChart);
+
+        // --- CONTROLES DE ANÁLISIS INDIVIDUAL ---
+        ['ind-chart-type', 'ind-sub-panel', 'toggle-ema21', 'toggle-sma50', 'toggle-sma200', 'toggle-bb', 'toggle-rsi', 'toggle-macd', 'toggle-vol', 'toggle-atr'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', renderIndividualChart);
+        });
+
+        document.querySelectorAll('.time-btn-ind').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.time-btn-ind').forEach(b => b.dataset.active = 'false');
+                btn.dataset.active = 'true';
+                const btnRange = document.getElementById('btn-ind-range');
+                if (btnRange) btnRange.dataset.active = 'false';
+                const rangePopover = document.getElementById('ind-range-popover');
+                if (rangePopover) rangePopover.classList.add('hidden');
+                document.getElementById('ind-date-from').value = '';
+                document.getElementById('ind-date-to').value = '';
+                renderIndividualChart();
+            });
+        });
+
+        ['ind-date-from', 'ind-date-to'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                document.querySelectorAll('.time-btn-ind').forEach(b => b.dataset.active = 'false');
+                const btnRange = document.getElementById('btn-ind-range');
+                if (btnRange) btnRange.dataset.active = 'true';
+                renderIndividualChart();
+            });
+        });
+
+        // Popover del botón compacto "📅 Rango"
+        const btnIndRange = document.getElementById('btn-ind-range');
+        const indRangePopover = document.getElementById('ind-range-popover');
+        const btnCloseIndRange = document.getElementById('btn-close-ind-range');
+
+        if (btnIndRange && indRangePopover) {
+            btnIndRange.addEventListener('click', (e) => {
+                e.stopPropagation();
+                indRangePopover.classList.toggle('hidden');
+            });
+            if (btnCloseIndRange) {
+                btnCloseIndRange.addEventListener('click', () => indRangePopover.classList.add('hidden'));
+            }
+            document.addEventListener('click', (e) => {
+                if (!indRangePopover.classList.contains('hidden') && !indRangePopover.contains(e.target) && e.target !== btnIndRange) {
+                    indRangePopover.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- CONTROLES DE RELATIVE VALUE ---
+        document.querySelectorAll('.time-btn-spread').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.time-btn-spread').forEach(b => b.dataset.active = 'false');
+                btn.dataset.active = 'true';
+                document.getElementById('spread-date-from').value = '';
+                document.getElementById('spread-date-to').value = '';
+                renderSpreadChart();
+            });
+        });
+
+        ['spread-date-from', 'spread-date-to'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                document.querySelectorAll('.time-btn-spread').forEach(b => b.dataset.active = 'false');
+                renderSpreadChart();
+            });
+        });
+
+        // --- CONTROLES DE MATRICES Y MÓVIL ---
+        document.getElementById('toggle-corr-filter').addEventListener('change', renderMatrices);
+
+        document.getElementById('btn-toggle-ind-filters').addEventListener('click', () => {
+            const container = document.getElementById('ind-filters-container');
+            const icon = document.getElementById('icon-ind-filters');
+            container.classList.toggle('hidden');
+            container.classList.toggle('flex');
+            icon.classList.toggle('rotate-180');
+        });
+
+        document.getElementById('btn-toggle-spread-filters').addEventListener('click', () => {
+            const container = document.getElementById('spread-filters-container');
+            const icon = document.getElementById('icon-spread-filters');
+            container.classList.toggle('hidden');
+            container.classList.toggle('flex');
+            icon.classList.toggle('rotate-180');
+        });
+
+        // --- LÓGICA MODAL / DRAWER: GUÍA Y GLOSARIO ---
+        const guideModal = document.getElementById('guide-modal');
+        const btnOpenGuide = document.getElementById('btn-open-guide');
+        const btnCloseGuide = document.getElementById('btn-close-guide');
+        const guideSearchInput = document.getElementById('guide-search');
+        const btnClearSearch = document.getElementById('btn-clear-guide-search');
+        const guideTabBtns = document.querySelectorAll('.guide-tab-btn');
+        const guidePanels = document.querySelectorAll('.guide-tab-panel');
+        const guideItems = document.querySelectorAll('.guide-item');
+        const guideSectionBadges = document.querySelectorAll('.guide-section-badge');
+        const guideNoResults = document.getElementById('guide-no-results');
+        let activeGuideTab = 'uso';
+
+        function openGuideModal() {
+            guideModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeGuideModal() {
+            guideModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        btnOpenGuide.addEventListener('click', openGuideModal);
+        btnCloseGuide.addEventListener('click', closeGuideModal);
+
+        guideModal.addEventListener('click', (e) => {
+            if (e.target === guideModal) closeGuideModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !guideModal.classList.contains('hidden')) {
+                closeGuideModal();
+            }
+        });
+
+        function activateGuideTab(tabName) {
+            activeGuideTab = tabName;
+            guideTabBtns.forEach(btn => {
+                const isSelected = btn.dataset.tab === tabName;
+                btn.dataset.active = isSelected ? 'true' : 'false';
+                if (isSelected) {
+                    btn.className = 'guide-tab-btn px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border transition-all whitespace-nowrap bg-ppi-blue text-white border-blue-500/40';
+                } else {
+                    btn.className = 'guide-tab-btn px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border transition-all whitespace-nowrap bg-[#0B1120] text-slate-400 border-slate-800 hover:text-white';
+                }
+            });
+
+            guidePanels.forEach(panel => {
+                panel.classList.toggle('hidden', panel.dataset.panel !== tabName);
+            });
+            guideItems.forEach(item => item.classList.remove('hidden'));
+            guideSectionBadges.forEach(badge => badge.classList.add('hidden'));
+            guideNoResults.classList.add('hidden');
+        }
+
+        guideTabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (guideSearchInput.value.trim() !== '') {
+                    guideSearchInput.value = '';
+                    btnClearSearch.classList.add('hidden');
+                }
+                activateGuideTab(btn.dataset.tab);
+            });
+        });
+
+        function normalizeText(str) {
+            return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        }
+
+        guideSearchInput.addEventListener('input', () => {
+            const rawQuery = guideSearchInput.value.trim();
+            btnClearSearch.classList.toggle('hidden', rawQuery === '');
+
+            if (rawQuery === '') {
+                activateGuideTab(activeGuideTab);
+                return;
+            }
+
+            const query = normalizeText(rawQuery);
+            let matches = 0;
+
+            guidePanels.forEach(panel => panel.classList.remove('hidden'));
+            guideSectionBadges.forEach(badge => badge.classList.remove('hidden'));
+
+            guideItems.forEach(item => {
+                const text = normalizeText(item.innerText);
+                const isMatch = text.includes(query);
+                item.classList.toggle('hidden', !isMatch);
+                if (isMatch) matches++;
+            });
+
+            guideNoResults.classList.toggle('hidden', matches > 0);
+        });
+
+        btnClearSearch.addEventListener('click', () => {
+            guideSearchInput.value = '';
+            btnClearSearch.classList.add('hidden');
+            activateGuideTab(activeGuideTab);
+            guideSearchInput.focus();
+        });
+
+        // --- INICIALIZACIÓN ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const resp = await fetch(`./datos_adrs.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!resp.ok) throw new Error('JSON aún no generado');
+                const payload = await resp.json();
+
+                if (payload && Array.isArray(payload.dates) && payload.dates.length > 0 && payload.tickers) {
+                    isRealDataLoaded = true;
+                    dates = payload.dates;
+                    realTickersStore = payload.tickers;
+
+                    if (payload.last_update) {
+                        document.getElementById('last-update').innerText = payload.last_update;
+                    }
+
+                    if (payload.matrices && payload.matrices.corr && payload.matrices.zscore) {
+                        validADRs.forEach(a => {
+                            matrixData[a] = {};
+                            validADRs.forEach(b => {
+                                matrixData[a][b] = {
+                                    corr: payload.matrices.corr[a]?.[b] ?? (a === b ? 1.0 : 0.0),
+                                    z: payload.matrices.zscore[a]?.[b] ?? 0.0
+                                };
+                            });
+                        });
+                    }
+
+                    renderAlertsFromJSON(payload.alerts || []);
+                } else {
+                    initFallbackData();
+                }
+            } catch (err) {
+                console.info('Modo vista previa activo (datos_adrs.json no encontrado todavía):', err.message);
+                initFallbackData();
+            }
+
+            renderMatrices();
+            renderIndividualChart();
+            renderSpreadChart();
+        });
+    </script>
+</body>
+</html>
