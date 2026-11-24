@@ -1,44 +1,42 @@
 name: Actualizar Datos ADRs (18:30 ART)
 
 on:
-schedule:
-# Lunes a Viernes a las 18:30 ART (UTC-3 -> 21:30 UTC)
-- cron: '30 21 * * 1-5'
-workflow_dispatch:
+  schedule:
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-update-data:
-runs-on: ubuntu-latest
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
 
-steps:
-  - name: Descargar repositorio
-    uses: actions/checkout@v4
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-  - name: Configurar Python 3.11
-    uses: actions/setup-python@v5
-    with:
-      python-version: '3.11'
-      cache: 'pip'
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-  - name: Instalar dependencias
-    run: |
-      python -m pip install --upgrade pip
-      pip install -r requirements.txt
+      - name: Descargar datos de Yahoo Finance y recalcular metricas
+        run: python actualizar_datos.py
 
-  - name: Descargar datos de Yahoo Finance y recalcular métricas
-    run: python actualizar_datos.py
-
-  - name: Guardar datos_adrs.json actualizado en el repositorio
-    run: |
-      git config --local user.email "github-actions[bot]@users.noreply.github.com"
-      git config --local user.name "Monitor ADRs Bot"
-      git add datos_adrs.json
-      if git diff --staged --quiet; then
-        echo "Sin cambios nuevos en datos_adrs.json"
-      else
-        git commit -m "chore: actualizacion diaria ADRs"
-        git push
-      fi
+      - name: Guardar datos_adrs.json actualizado en el repositorio
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "Monitor ADRs Bot"
+          git add datos_adrs.json
+          if git diff --staged --quiet; then
+            echo "Sin cambios nuevos en datos_adrs.json"
+          else
+            git commit -m "chore: actualizacion diaria ADRs"
+            git push
+          fi
