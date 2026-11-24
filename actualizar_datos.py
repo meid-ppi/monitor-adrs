@@ -161,7 +161,10 @@ def main() -> None:
             continue
 
         hist = hist[["Open", "High", "Low", "Close", "Volume"]].copy()
-        hist.index = pd.to_datetime(hist.index).tz_localize(None).normalize()
+        idx = pd.to_datetime(hist.index)
+        if idx.tz is not None:
+            idx = idx.tz_convert("America/New_York").tz_localize(None)
+        hist.index = idx.normalize()
         hist = hist[~hist.index.duplicated(keep="last")].sort_index()
         raw_frames[ticker] = hist
 
@@ -301,7 +304,7 @@ def main() -> None:
 
     # Construir Matrices de Correlación y Z-Score y detectar alertas Relative Value
     closes_df = pd.DataFrame({t: processed_frames[t]["Close"] for t in active_tickers})
-    returns_df = closes_df.pct_change()
+    returns_df = closes_df.pct_change(fill_method=None)
     corr_matrix_60 = returns_df.tail(RV_WINDOW).corr()
 
     matrix_corr_out: dict[str, dict[str, float]] = {t: {} for t in active_tickers}
