@@ -1,40 +1,43 @@
 name: Actualizar Datos ADRs (18:30 ART)
 on:
 schedule:
-Lunes a Viernes a las 18:30 ART (America/Argentina/Buenos_Aires es UTC-3 -> 21:30 UTC)
-cron: '30 21 * * 1-5'
-Permite ejecutar la actualización manualmente en cualquier momento con un clic
+# Lunes a Viernes a las 18:30 ART (UTC-3 -> 21:30 UTC)
+- cron: '30 21 * * 1-5'
 workflow_dispatch:
 permissions:
 contents: write
 jobs:
 update-data:
 runs-on: ubuntu-latest
-    steps:
-- name: Descargar repositorio
-uses: actions/checkout@v4
-      - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
+```
+steps:
+  - name: Descargar repositorio
+    uses: actions/checkout@v4
 
-      - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+  - name: Configurar Python 3.11
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.11'
+      cache: 'pip'
 
-      - name: Descargar datos de Yahoo Finance y recalcular métricas
-        run: python actualizar\_datos.py
+  - name: Instalar dependencias
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
 
-      - name: Guardar datos\_adrs.json actualizado en el repositorio
-        run: |
-          git config --local user.email "github-actions\[bot]@users.noreply.github.com"
-          git config --local user.name "Monitor ADRs Bot"
-          git add datos\_adrs.json
-          if git diff --staged --quiet; then
-            echo "Sin cambios nuevos en datos\_adrs.json"
-          else
-            git commit -m "chore: actualización diaria ADRs $(date +'%Y-%m-%d')"
-            git push
-          fi
+  - name: Descargar datos de Yahoo Finance y recalcular métricas
+    run: python actualizar_datos.py
+
+  - name: Guardar datos_adrs.json actualizado en el repositorio
+    run: |
+      git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      git config --local user.name "Monitor ADRs Bot"
+      git add datos_adrs.json
+      if git diff --staged --quiet; then
+        echo "Sin cambios nuevos en datos_adrs.json"
+      else
+        git commit -m "chore: actualizacion diaria ADRs"
+        git push
+      fi
+
+```
