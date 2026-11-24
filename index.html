@@ -116,7 +116,7 @@
             </div>
         </div>
 
-        <!-- Grilla Responsive Adaptable (1 columna en móvil, auto-fill sin cortes en desktop) -->
+        <!-- Grilla Responsive Adaptable -->
         <div id="alerts-grid" class="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
             <!-- Alerta Compra Individual -->
             <div onclick="navigateFromAlert('ind', 'GGAL')" data-category="compra" role="button" tabindex="0" class="alert-card group cursor-pointer bg-ppi-card rounded-xl p-5 border border-ppi-border shadow-lg hover:border-blue-500/60 hover:bg-[#151e32] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
@@ -860,6 +860,7 @@
         let chartRel = null;
         let isRealDataLoaded = false;
         let realTickersStore = {};
+        let dateIndexMap = new Map();
 
         // Catálogo oficial de los 17 ADRs
         const ADR_META = {
@@ -902,7 +903,14 @@
 
         const matrixData = {};
 
-        // Funciones Cálculo de Medias y Bollinger (usadas en modo fallback y para Ratio Nominal)
+        function rebuildDateIndexMap() {
+            dateIndexMap = new Map();
+            for (let i = 0; i < dates.length; i++) {
+                dateIndexMap.set(dates[i], i);
+            }
+        }
+
+        // Funciones Cálculo de Medias y Bollinger
         function calculateMA(data, period, isEMA = false) {
             if (!data || data.length === 0) return [];
             let res = [];
@@ -969,7 +977,6 @@
                 lastUpdateEl.className = 'text-sm sm:text-base font-semibold text-amber-400';
             }
 
-            // Generar las últimas 1260 ruedas hábiles terminando exactamente en la fecha actual
             const MOCK_DAYS = 1260;
             dates = [];
             let cursor = new Date();
@@ -981,6 +988,7 @@
                 cursor.setDate(cursor.getDate() - 1);
             }
             dates.reverse();
+            rebuildDateIndexMap();
 
             let val = 25;
             fullDataInd = dates.map(dt => {
@@ -1070,12 +1078,12 @@
             const dateToBar = new Map(fullDataInd.map(b => [b.x, b]));
             signalsBuy = (tData.buy_signals || []).map(ts => {
                 const bar = dateToBar.get(ts);
-                return bar ? { x: ts, y: bar.l * 0.985 } : null;
+                return bar && bar.l != null ? { x: ts, y: bar.l * 0.985 } : null;
             }).filter(Boolean);
 
             signalsSell = (tData.sell_signals || []).map(ts => {
                 const bar = dateToBar.get(ts);
-                return bar ? { x: ts, y: bar.h * 1.015 } : null;
+                return bar && bar.h != null ? { x: ts, y: bar.h * 1.015 } : null;
             }).filter(Boolean);
         }
 
@@ -1188,7 +1196,6 @@
                 `;
             }).join('');
 
-            // Reaplicar filtro de píldora activo
             const activeBtn = document.querySelector('.alert-filter-btn[data-active="true"]');
             if (activeBtn) activeBtn.click();
         }
@@ -1213,13 +1220,11 @@
                 validADRs.forEach(colAsset => {
                     const data = matrixData[rowAsset][colAsset];
                     
-                    // Colores Correlación
                     let bgCorr = 'bg-[#0B1120] text-slate-500';
                     if (data.corr >= 0.75 && rowAsset !== colAsset) bgCorr = 'bg-emerald-900/40 text-emerald-400';
                     if (data.corr < 0.75 && rowAsset !== colAsset) bgCorr = 'bg-slate-800 text-slate-300';
                     if (rowAsset === colAsset) bgCorr = 'bg-[#1F2937] text-slate-500';
 
-                    // Colores Z-Score
                     let bgZ = 'bg-[#0B1120] text-slate-400';
                     if (rowAsset !== colAsset) {
                         if (data.z > 2) bgZ = 'bg-red-900/60 text-red-300 font-bold';
@@ -1230,13 +1235,10 @@
                         bgZ = 'bg-[#1F2937] text-slate-500';
                     }
 
-                    // Opacidad (Filtro)
                     let opacityClass = (hideLowCorr && data.corr < 0.75 && rowAsset !== colAsset) ? 'opacity-20 grayscale' : 'opacity-100 hover:brightness-125';
 
-                    // Celdas
                     rowCorr += `<td class="border border-slate-700/50 p-2 cursor-pointer transition-all ${bgCorr} ${opacityClass}" onclick="selectPairFromMatrix('${rowAsset}', '${colAsset}')">${data.corr.toFixed(2)}</td>`;
                     
-                    // Logic texto tooltip
                     let tooltipAction = "Sin señal";
                     let actionColor = "text-slate-300";
                     if(data.z > 2) { tooltipAction = `Vender ${rowAsset} / Comprar ${colAsset}`; actionColor = "text-red-400"; }
@@ -1336,6 +1338,7 @@
 
         // Helper para filtrar índices basado en fechas o botones
         function getFilteredIndices(chartId) {
+            if (!dates || dates.length === 0) return { start: 0, end: 0 };
             let activePeriod = document.querySelector(`.time-btn-${chartId}[data-active="true"]`);
             let fromInput = document.getElementById(`${chartId}-date-from`).value;
             let toInput = document.getElementById(`${chartId}-date-to`).value;
@@ -1345,7 +1348,7 @@
 
             if (activePeriod) {
                 let period = activePeriod.dataset.period;
-                if (period === 'YTD' && dates.length > 0) {
+                if (period === 'YTD') {
                     const lastYear = new Date(dates[dates.length - 1]).getFullYear();
                     const jan1 = new Date(lastYear, 0, 1).getTime();
                     const idx = dates.findIndex(d => d >= jan1);
@@ -1394,25 +1397,26 @@
 
             document.getElementById('dp-sep-rsi').classList.toggle('hidden', !shRSI);
             document.getElementById('dp-wrap-rsi').classList.toggle('hidden', !shRSI);
-            if (shRSI) document.getElementById('dp-rsi').innerText = dummyRSI[realIndex].y != null ? dummyRSI[realIndex].y.toFixed(2) : '-';
+            if (shRSI) document.getElementById('dp-rsi').innerText = dummyRSI[realIndex]?.y != null ? dummyRSI[realIndex].y.toFixed(2) : '-';
 
             document.getElementById('dp-sep-macd').classList.toggle('hidden', !shMACD);
             document.getElementById('dp-wrap-macd').classList.toggle('hidden', !shMACD);
-            if (shMACD) document.getElementById('dp-macd').innerText = dummyMACD[realIndex].y != null ? dummyMACD[realIndex].y.toFixed(3) : '-';
+            if (shMACD) document.getElementById('dp-macd').innerText = dummyMACD[realIndex]?.y != null ? dummyMACD[realIndex].y.toFixed(3) : '-';
 
             document.getElementById('dp-sep-vol').classList.toggle('hidden', !shVol);
             document.getElementById('dp-wrap-vol').classList.toggle('hidden', !shVol);
             if (shVol) {
-                const v = dummyVol[realIndex].y || 0;
+                const v = dummyVol[realIndex]?.y || 0;
                 document.getElementById('dp-vol').innerText = v >= 1000000 ? (v / 1000000).toFixed(2) + 'M' : (v / 1000).toFixed(1) + 'K';
             }
 
             document.getElementById('dp-sep-atr').classList.toggle('hidden', !shATR);
             document.getElementById('dp-wrap-atr').classList.toggle('hidden', !shATR);
-            if (shATR) document.getElementById('dp-atr').innerText = dummyATR[realIndex].y != null ? '$' + dummyATR[realIndex].y.toFixed(2) : '-';
+            if (shATR) document.getElementById('dp-atr').innerText = dummyATR[realIndex]?.y != null ? '$' + dummyATR[realIndex].y.toFixed(2) : '-';
         }
 
         function renderIndividualChart() {
+            if (!dates || dates.length === 0) return;
             const ctx = document.getElementById('chartIndividual').getContext('2d');
             const assetName = document.getElementById('ind-asset').value.trim().toUpperCase() || 'GGAL';
             if (isRealDataLoaded && realTickersStore[assetName]) {
@@ -1449,6 +1453,8 @@
             updateIndividualStatusBar(end, true);
 
             const filteredData = fullDataInd.slice(start, end + 1);
+            if (filteredData.length === 0) return;
+
             const datasets = [];
             const visibleYValues = [];
 
@@ -1458,17 +1464,22 @@
                 if (d.c != null) visibleYValues.push(d.c);
             });
 
-            if (chartType === 'candlestick') {
+            const canUseCandlestick = chartType === 'candlestick' && Chart.registry && Chart.registry.controllers.get('candlestick');
+
+            if (canUseCandlestick) {
+                const candleData = filteredData
+                    .filter(d => d.o != null && d.h != null && d.l != null && d.c != null)
+                    .map(d => ({ x: d.x, o: d.o, h: d.h, l: d.l, c: d.c }));
                 datasets.push({
                     label: `Precio ${assetName}`,
-                    data: filteredData.filter(d => d.c != null),
+                    data: candleData,
                     type: 'candlestick',
-                    color: {
+                    backgroundColors: {
                         up: '#10B981',
                         down: '#EF4444',
                         unchanged: '#9CA3AF'
                     },
-                    borderColor: {
+                    borderColors: {
                         up: '#10B981',
                         down: '#EF4444',
                         unchanged: '#9CA3AF'
@@ -1515,8 +1526,10 @@
                 datasets.push({ type: 'line', label: 'BB Low', data: bbLowSlice, borderColor: '#8B5CF6', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'y' });
             }
 
-            const visibleBuy = signalsBuy.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
-            const visibleSell = signalsSell.filter(s => s.x >= filteredData[0].x && s.x <= filteredData[filteredData.length-1].x);
+            const minX = filteredData[0].x;
+            const maxX = filteredData[filteredData.length - 1].x;
+            const visibleBuy = signalsBuy.filter(s => s.x >= minX && s.x <= maxX);
+            const visibleSell = signalsSell.filter(s => s.x >= minX && s.x <= maxX);
             visibleBuy.forEach(s => { if (s.y != null) visibleYValues.push(s.y); });
             visibleSell.forEach(s => { if (s.y != null) visibleYValues.push(s.y); });
 
@@ -1547,7 +1560,7 @@
                 const rvolColors = volData.map((d, i) => {
                     let realIdx = start + i;
                     let smaV = dummyVolSMA[realIdx]?.y || 1;
-                    let rvol = d.y / smaV;
+                    let rvol = (d.y || 0) / smaV;
                     return rvol > 1.2 ? 'rgba(249, 115, 22, 0.8)' : 'rgba(96, 165, 250, 0.35)';
                 });
                 datasets.push({
@@ -1577,7 +1590,7 @@
                 content: '$' + lastPrice.toFixed(2),
                 backgroundColor: '#3B82F6', color: '#0B1120',
                 font: { size: 11, family: 'Inter', weight: 'bold' },
-                padding: {x: 5, y: 2}, borderRadius: 4,
+                padding: {x: 6, y: 2}, borderRadius: 4,
                 position: 'start', xAdjust: 6
             };
 
@@ -1587,7 +1600,7 @@
                 data: { datasets: datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { left: 15, right: 78, top: 8 } },
+                    layout: { padding: { left: 15, right: 86, top: 8 } },
                     events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
@@ -1602,7 +1615,7 @@
                             }
                         },
                         legend: { display: false },
-                        annotation: { annotations: customAnnotations }
+                        annotation: { clip: false, annotations: customAnnotations }
                     },
                     scales: {
                         x: { 
@@ -1642,8 +1655,9 @@
                     },
                     onHover: (event, elements) => {
                         if (elements && elements.length > 0) {
-                            const dataIndex = elements[0].index;
-                            const realIndex = start + dataIndex;
+                            const rawX = elements[0].element?.$context?.raw?.x;
+                            const mappedIdx = rawX != null ? dateIndexMap.get(rawX) : undefined;
+                            const realIndex = mappedIdx !== undefined ? mappedIdx : (start + elements[0].index);
                             updateIndividualStatusBar(realIndex, false);
                         } else {
                             updateIndividualStatusBar(end, true);
@@ -1673,8 +1687,8 @@
             dateEl.innerText = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium' }).format(new Date(dates[realIndex]));
             if (badgeEl) badgeEl.classList.toggle('hidden', !isLatest);
 
-            const z = fullZScore[realIndex].y;
-            const ratio = fullRatio[realIndex].y;
+            const z = fullZScore[realIndex]?.y;
+            const ratio = fullRatio[realIndex]?.y;
             const sma = fullRatioSMA[realIndex]?.y;
             const diffPct = (sma && ratio != null) ? ((ratio - sma) / sma) * 100 : 0;
 
@@ -1693,6 +1707,7 @@
         }
 
         function renderSpreadChart() {
+            if (!dates || dates.length === 0) return;
             const ctx = document.getElementById('chartSpread').getContext('2d');
             const assetA = document.getElementById('spread-asset-a').value.trim().toUpperCase() || 'BMA';
             const assetB = document.getElementById('spread-asset-b').value.trim().toUpperCase() || 'BBAR';
@@ -1734,7 +1749,6 @@
             const lastZ = lastZPt.y;
             const lastRatio = lastRPt.y;
 
-            // Escala dinámica del Z-Score para que nunca se recorte si supera ±3.5
             let zMinLimit = -3.5;
             let zMaxLimit = 3.5;
             if (validZ.length > 0) {
@@ -1819,7 +1833,7 @@
                     backgroundColor: '#38BDF8',
                     color: '#0B1120',
                     font: { size: 10, family: 'Inter', weight: 'bold' },
-                    padding: { x: 5, y: 2 },
+                    padding: { x: 6, y: 2 },
                     borderRadius: 4,
                     position: 'start',
                     xAdjust: 6
@@ -1835,7 +1849,7 @@
                     backgroundColor: '#A78BFA',
                     color: '#0B1120',
                     font: { size: 10, family: 'Inter', weight: 'bold' },
-                    padding: { x: 5, y: 2 },
+                    padding: { x: 6, y: 2 },
                     borderRadius: 4,
                     position: 'start',
                     xAdjust: 6
@@ -1884,13 +1898,13 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    layout: { padding: { left: 12, right: 68, top: 8 } },
+                    layout: { padding: { left: 12, right: 74, top: 8 } },
                     events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         tooltip: { enabled: false },
                         legend: { display: false },
-                        annotation: { annotations: spreadAnnotations }
+                        annotation: { clip: false, annotations: spreadAnnotations }
                     },
                     scales: {
                         x: {
@@ -1903,7 +1917,6 @@
                                 maxTicksLimit: window.innerWidth < 768 ? 5 : 12
                             }
                         },
-                        // Chart.js apila ejes de abajo hacia arriba: yRatio va primero (35% inferior) y yZ segundo (65% superior)
                         yRatio: {
                             type: 'linear',
                             position: 'left',
@@ -1936,8 +1949,9 @@
                     },
                     onHover: (event, elements) => {
                         if (elements && elements.length > 0) {
-                            const dataIndex = elements[0].index;
-                            const realIndex = start + dataIndex;
+                            const rawX = elements[0].element?.$context?.raw?.x;
+                            const mappedIdx = rawX != null ? dateIndexMap.get(rawX) : undefined;
+                            const realIndex = mappedIdx !== undefined ? mappedIdx : (start + elements[0].index);
                             updateSpreadStatusBar(realIndex, false);
                         } else {
                             updateSpreadStatusBar(end, true);
@@ -2177,6 +2191,7 @@
                 if (payload && Array.isArray(payload.dates) && payload.dates.length > 0 && payload.tickers) {
                     isRealDataLoaded = true;
                     dates = payload.dates;
+                    rebuildDateIndexMap();
                     realTickersStore = payload.tickers;
 
                     if (payload.last_update) {
