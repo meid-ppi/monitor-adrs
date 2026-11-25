@@ -326,7 +326,7 @@ def main() -> None:
             z_series = (log_ratio - lr_mean) / lr_std.replace(0, np.nan)
 
             z_curr = float(z_series.iloc[-1]) if not pd.isna(z_series.iloc[-1]) else 0.0
-            z_prev = float(z_series.iloc[-2]) if not pd.isna(z_series.iloc[-2]) else 0.0
+            z_prev5 = z_series.iloc[-6:-1].dropna()
 
             matrix_corr_out[a][b] = round(corr_val, 3)
             matrix_corr_out[b][a] = round(corr_val, 3)
@@ -350,8 +350,8 @@ def main() -> None:
             if zero_crossings < 2:
                 continue
 
-            # Disparadores de Relative Value
-            if abs(z_curr) > 3.0:
+            # Disparadores de Relative Value (Stop-Loss -> Watchlist -> Rotación en ventana de 5 ruedas)
+            if abs(z_curr) >= 3.0:
                 alerts_output.append(
                     {
                         "type": "rv",
@@ -362,32 +362,13 @@ def main() -> None:
                         "subtitle": f"Correlación: {corr_val:.2f} · Cruces 0: {zero_crossings}",
                         "badge": "STOP-LOSS",
                         "badgeStyle": "stoploss",
-                        "description": f"Z-Score en {z_curr:+.2f} (|Z| > 3.0). Invalida reversión a la media por posible evento fundamental.",
+                        "description": f"Z-Score en {z_curr:+.2f} (|Z| ≥ 3.0). Invalida reversión a la media por posible evento fundamental.",
                         "footerLabel": "Relative Value",
                         "footerAction": "Ver spread →",
                     }
                 )
-            elif abs(z_prev) > 2.0 and abs(z_curr) <= 2.0:
-                accion = (
-                    f"Short {a}, Long {b}." if z_prev > 2.0 else f"Long {a}, Short {b}."
-                )
-                alerts_output.append(
-                    {
-                        "type": "rv",
-                        "category": "rv",
-                        "tickerA": a,
-                        "tickerB": b,
-                        "title": f"{a} / {b}",
-                        "subtitle": f"Correlación: {corr_val:.2f} · Cruces 0: {zero_crossings}",
-                        "badge": "ROTACIÓN",
-                        "badgeStyle": "rotacion",
-                        "description": f"Z-Score vuelve dentro de ±2.0 ({z_curr:+.2f}). {accion}",
-                        "footerLabel": "Relative Value",
-                        "footerAction": "Ver spread →",
-                    }
-                )
-            elif 2.0 < abs(z_curr) <= 3.0:
-                lado = f"{a} caro vs {b}" if z_curr > 2.0 else f"{a} barato vs {b}"
+            elif 2.0 <= abs(z_curr) < 3.0:
+                lado = f"{a} caro vs {b}" if z_curr >= 2.0 else f"{a} barato vs {b}"
                 alerts_output.append(
                     {
                         "type": "rv",
@@ -399,6 +380,29 @@ def main() -> None:
                         "badge": "WATCHLIST",
                         "badgeStyle": "watchlist",
                         "description": f"Z-Score alcanza {z_curr:+.2f} ({lado}). Esperando confirmación de cruce hacia 0.",
+                        "footerLabel": "Relative Value",
+                        "footerAction": "Ver spread →",
+                    }
+                )
+            elif abs(z_curr) < 2.0 and not z_prev5.empty and (
+                (z_curr >= 0 and (z_prev5 >= 2.0).any())
+                or (z_curr <= 0 and (z_prev5 <= -2.0).any())
+            ):
+                came_from_high = (z_prev5 >= 2.0).any() and z_curr >= 0
+                accion = (
+                    f"Short {a}, Long {b}." if came_from_high else f"Long {a}, Short {b}."
+                )
+                alerts_output.append(
+                    {
+                        "type": "rv",
+                        "category": "rv",
+                        "tickerA": a,
+                        "tickerB": b,
+                        "title": f"{a} / {b}",
+                        "subtitle": f"Correlación: {corr_val:.2f} · Cruces 0: {zero_crossings}",
+                        "badge": "ROTACIÓN",
+                        "badgeStyle": "rotacion",
+                        "description": f"Z-Score vuelve dentro de ±2.0 ({z_curr:+.2f}) tras extremo reciente. {accion}",
                         "footerLabel": "Relative Value",
                         "footerAction": "Ver spread →",
                     }
